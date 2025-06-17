@@ -1,16 +1,17 @@
+import 'package:anri/pages/ticket_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anri/pages/login_page.dart';
 
-// Dummy data for Problem Requests
+// Dummy data untuk Problem Requests
 class ProblemRequest {
   final String id;
   final String title;
   final String category;
   final String status;
   final String division;
-  final String priority; // e.g., 'High', 'Medium', 'Low'
-  final String lastUpdate; // e.g., '2 days ago'
+  final String priority;
+  final String lastUpdate;
 
   ProblemRequest({
     required this.id,
@@ -31,16 +32,75 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // === STATE MANAGEMENT BARU ===
+  int _selectedIndex = 0;
   String _selectedFilter = 'Semua Keluhan';
 
+  // Daftar keluhan tidak berubah
   final List<ProblemRequest> _allProblemRequests = [
-    ProblemRequest(id: 'PR-001', title: 'Laptop butuh perbaikan software', category: 'Software', status: 'Baru', division: 'IT', priority: 'Tinggi', lastUpdate: 'Baru'),
-    ProblemRequest(id: 'PR-002', title: 'Printer Ruang A tidak berfungsi', category: 'Hardware', status: 'Diproses', division: 'Umum', priority: 'Sedang', lastUpdate: '1 jam lalu'),
-    ProblemRequest(id: 'PR-003', title: 'Akses jaringan lambat', category: 'Jaringan', status: 'Selesai', division: 'IT', priority: 'Tinggi', lastUpdate: 'Kemarin'),
-    ProblemRequest(id: 'PR-004', title: 'AC Ruang Server Panas', category: 'Fasilitas', status: 'Baru', division: 'Fasilitas', priority: 'Darurat', lastUpdate: '10 menit lalu'),
-    ProblemRequest(id: 'PR-005', title: 'Permintaan instalasi software baru', category: 'Software', status: 'Diproses', division: 'IT', priority: 'Sedang', lastUpdate: '2 jam lalu'),
-    ProblemRequest(id: 'PR-006', title: 'Penerangan koridor lantai 2 mati', category: 'Listrik', status: 'Selesai', division: 'Umum', priority: 'Rendah', lastUpdate: '3 hari lalu'),
-    ProblemRequest(id: 'PR-007', title: 'Mouse kantor tidak responsif', category: 'Hardware', status: 'Baru', division: 'IT', priority: 'Sedang', lastUpdate: '25 menit lalu'),
+    ProblemRequest(
+      id: 'PR-001',
+      title: 'Laptop butuh perbaikan software',
+      category: 'Software',
+      status: 'Baru',
+      division: 'IT',
+      priority: 'High',
+      lastUpdate: 'Baru',
+    ),
+    ProblemRequest(
+      id: 'PR-002',
+      title: 'Printer Ruang A tidak berfungsi',
+      category: 'Hardware',
+      status: 'Diproses',
+      division: 'Umum',
+      priority: 'Medium',
+      lastUpdate: '1 jam lalu',
+    ),
+    ProblemRequest(
+      id: 'PR-003',
+      title: 'Akses jaringan lambat',
+      category: 'Jaringan',
+      status: 'Selesai',
+      division: 'IT',
+      priority: 'High',
+      lastUpdate: 'Kemarin',
+    ),
+    ProblemRequest(
+      id: 'PR-004',
+      title: 'AC Ruang Server Panas',
+      category: 'Fasilitas',
+      status: 'Baru',
+      division: 'Fasilitas',
+      priority: 'Critical',
+      lastUpdate: '10 menit lalu',
+    ),
+    ProblemRequest(
+      id: 'PR-005',
+      title: 'Permintaan instalasi software baru',
+      category: 'Software',
+      status: 'Diproses',
+      division: 'IT',
+      priority: 'Medium',
+      lastUpdate: '2 jam lalu',
+    ),
+    ProblemRequest(
+      id: 'PR-006',
+      title: 'Penerangan koridor lantai 2 mati',
+      category: 'Listrik',
+      status: 'Selesai',
+      division: 'Umum',
+      priority: 'Low',
+      lastUpdate: '3 hari lalu',
+    ),
+    ProblemRequest(
+      id: 'PR-007',
+      title: 'Mouse kantor tidak responsif',
+      category: 'Hardware',
+      status: 'Baru',
+      division: 'IT',
+      priority: 'Medium',
+      lastUpdate: '25 menit lalu',
+    ),
   ];
 
   List<ProblemRequest> _filteredProblemRequests = [];
@@ -51,31 +111,34 @@ class _HomePageState extends State<HomePage> {
     _filterRequests();
   }
 
+  // === FUNGSI FILTER DIMODIFIKASI ===
   void _filterRequests() {
     setState(() {
+      // Filter untuk dashboard utama (tidak termasuk yang sudah selesai)
       if (_selectedFilter == 'Semua Keluhan') {
-        _filteredProblemRequests = _allProblemRequests;
+        _filteredProblemRequests = _allProblemRequests
+            .where((req) => req.status != 'Selesai')
+            .toList();
       } else if (_selectedFilter == 'Baru') {
-        _filteredProblemRequests = _allProblemRequests.where((req) => req.status == 'Baru').toList();
+        _filteredProblemRequests = _allProblemRequests
+            .where((req) => req.status == 'Baru')
+            .toList();
       } else if (_selectedFilter == 'Diproses') {
-        _filteredProblemRequests = _allProblemRequests.where((req) => req.status == 'Diproses').toList();
-      } else if (_selectedFilter == 'Selesai') {
-        _filteredProblemRequests = _allProblemRequests.where((req) => req.status == 'Selesai').toList();
+        _filteredProblemRequests = _allProblemRequests
+            .where((req) => req.status == 'Diproses')
+            .toList();
       } else if (_selectedFilter == 'Divisi IT') {
-        _filteredProblemRequests = _allProblemRequests.where((req) => req.division == 'IT').toList();
+        _filteredProblemRequests = _allProblemRequests
+            .where((req) => req.division == 'IT' && req.status != 'Selesai')
+            .toList();
       }
     });
   }
 
-  // <--- FUNGSI LOGOUT BARU DITAMBAHKAN DI SINI --->
   Future<void> _logout(BuildContext context) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    
-    // Set status login menjadi false
     await prefs.setBool('isLoggedIn', false);
-
     if (context.mounted) {
-      // Kembali ke LoginPage dan hapus semua halaman sebelumnya
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -86,22 +149,128 @@ class _HomePageState extends State<HomePage> {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'Baru': return Colors.red.shade700;
-      case 'Diproses': return Colors.orange.shade700;
-      case 'Selesai': return Colors.green.shade700;
-      default: return Colors.grey.shade700;
+      case 'Baru':
+        return Colors.red.shade700;
+      case 'Diproses':
+        return Colors.orange.shade700;
+      case 'Selesai':
+        return Colors.green.shade700;
+      default:
+        return Colors.grey.shade700;
     }
   }
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Software': return Icons.computer;
-      case 'Hardware': return Icons.print;
-      case 'Jaringan': return Icons.wifi;
-      case 'Fasilitas': return Icons.lightbulb_outline;
-      case 'Listrik': return Icons.flash_on;
-      default: return Icons.miscellaneous_services;
+      case 'Software':
+        return Icons.computer;
+      case 'Hardware':
+        return Icons.print;
+      case 'Jaringan':
+        return Icons.wifi;
+      case 'Fasilitas':
+        return Icons.lightbulb_outline;
+      case 'Listrik':
+        return Icons.flash_on;
+      default:
+        return Icons.miscellaneous_services;
     }
+  }
+
+  // === WIDGET BUILDER BARU ===
+
+  // Widget untuk membangun tampilan berdasarkan item navigasi yang dipilih
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildDashboardBody();
+      case 1:
+        return _buildHistoryBody();
+      case 2:
+        return _buildSettingsBody();
+      default:
+        return _buildDashboardBody();
+    }
+  }
+
+  // Tampilan untuk Dashboard (Beranda)
+  Widget _buildDashboardBody() {
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Row(
+            children: [
+              _buildFilterChip('Semua Keluhan'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Baru'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Diproses'),
+              const SizedBox(width: 8),
+              _buildFilterChip('Divisi IT'),
+              // Filter "Selesai" sudah dihapus dari sini
+            ],
+          ),
+        ),
+        Expanded(
+          child: _filteredProblemRequests.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Tidak ada keluhan aktif.',
+                    style: TextStyle(fontSize: 16, color: Colors.blueGrey),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  itemCount: _filteredProblemRequests.length,
+                  itemBuilder: (context, index) {
+                    final request = _filteredProblemRequests[index];
+                    return _buildProblemCard(request);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // Tampilan untuk Riwayat
+  Widget _buildHistoryBody() {
+    final completedRequests = _allProblemRequests
+        .where((req) => req.status == 'Selesai')
+        .toList();
+
+    return completedRequests.isEmpty
+        ? const Center(
+            child: Text(
+              'Tidak ada riwayat keluhan.',
+              style: TextStyle(fontSize: 16, color: Colors.blueGrey),
+            ),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 18.0,
+            ),
+            itemCount: completedRequests.length,
+            itemBuilder: (context, index) {
+              final request = completedRequests[index];
+              return _buildProblemCard(request);
+            },
+          );
+  }
+
+  // Tampilan untuk Pengaturan (Placeholder)
+  Widget _buildSettingsBody() {
+    return const Center(
+      child: Text(
+        'Halaman Pengaturan',
+        style: TextStyle(fontSize: 22, color: Colors.blueGrey),
+      ),
+    );
   }
 
   @override
@@ -110,153 +279,73 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
-        title: const Text(
-          'ANRI Helpdesk Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        title: Text(
+          _selectedIndex == 0
+              ? 'ANRI Helpdesk Dashboard'
+              : (_selectedIndex == 1 ? 'Riwayat Keluhan' : 'Pengaturan'),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
             tooltip: 'Notifikasi',
-            onPressed: () {
-              print('Notifications pressed');
-            },
+            onPressed: () {},
           ),
           IconButton(
             icon: const Icon(Icons.account_circle),
             tooltip: 'Profil',
-            onPressed: () {
-              print('Profile pressed');
-            },
+            onPressed: () {},
           ),
-          // <--- TOMBOL LOGOUT DITAMBAHKAN DI SINI --->
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
-            onPressed: () {
-              _logout(context);
-            },
+            onPressed: () => _logout(context),
           ),
         ],
       ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.white, Color(0xFFE0F2F7), Color(0xFFBBDEFB), Colors.blueAccent],
+            colors: [
+              Colors.white,
+              Color(0xFFE0F2F7),
+              Color(0xFFBBDEFB),
+              Colors.blueAccent,
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             stops: [0.0, 0.4, 0.7, 1.0],
           ),
         ),
-        child: Column(
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-              child: Row(
-                children: [
-                  _buildFilterChip('Semua Keluhan'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Baru'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Diproses'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Selesai'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Divisi IT'),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _filteredProblemRequests.isEmpty
-                  ? const Center(child: Text('Tidak ada keluhan untuk filter ini.', style: TextStyle(fontSize: 16, color: Colors.blueGrey)))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      itemCount: _filteredProblemRequests.length,
-                      itemBuilder: (context, index) {
-                        final request = _filteredProblemRequests[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 8.0),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          elevation: 3,
-                          child: InkWell(
-                            onTap: () {
-                              print('Tapped on: ${request.title}');
-                            },
-                            borderRadius: BorderRadius.circular(15),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(request.id, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue.shade800)),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: _getStatusColor(request.status).withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(request.status, style: TextStyle(color: _getStatusColor(request.status), fontWeight: FontWeight.bold, fontSize: 12)),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(request.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(_getCategoryIcon(request.category), size: 16, color: Colors.grey.shade600),
-                                      const SizedBox(width: 4),
-                                      Text('${request.division} - ${request.category}', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Prioritas: ${request.priority}', style: TextStyle(fontSize: 13, color: Colors.blueGrey.shade700, fontWeight: FontWeight.w500)),
-                                      Text(request.lastUpdate, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+        child: _buildBody(), // Memanggil builder dinamis
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          print('Tambah Keluhan Baru pressed');
-        },
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
+      // === FLOATING ACTION BUTTON DIHILANGKAN ===
+      // floatingActionButton: FloatingActionButton(...)
+
+      // === BOTTOM NAVIGATION BAR DIMODIFIKASI ===
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
         selectedItemColor: Colors.blue.shade700,
         unselectedItemColor: Colors.grey.shade600,
         type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          print('Bottom bar item $index tapped');
-        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Riwayat'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Pengaturan'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Pengaturan',
+          ),
         ],
       ),
     );
   }
 
+  // Widget untuk Chip Filter
   Widget _buildFilterChip(String label) {
     bool isSelected = _selectedFilter == label;
     return ChoiceChip(
@@ -280,6 +369,106 @@ class _HomePageState extends State<HomePage> {
       ),
       elevation: isSelected ? 2 : 0,
       shadowColor: Colors.blue.shade50,
+    );
+  }
+
+  // Widget untuk Kartu Laporan (dibuat jadi method agar bisa dipakai ulang)
+  Widget _buildProblemCard(ProblemRequest request) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 3,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TicketDetailScreen(request: request),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    request.id,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(request.status).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      request.status,
+                      style: TextStyle(
+                        color: _getStatusColor(request.status),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                request.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    _getCategoryIcon(request.category),
+                    size: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${request.division} - ${request.category}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Prioritas: ${request.priority}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blueGrey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    request.lastUpdate,
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

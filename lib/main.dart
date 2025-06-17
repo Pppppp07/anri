@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:anri/pages/splash_screen.dart'; // Import baru
+import 'package:anri/pages/splash_screen.dart';
 
 // Fungsi utama yang menjalankan aplikasi Flutter
 void main() {
