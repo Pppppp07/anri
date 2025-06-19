@@ -1,143 +1,54 @@
 import 'package:flutter/material.dart';
-import 'package:anri/home_page.dart'; // Import untuk mengakses kelas ProblemRequest
+import 'package:anri/home_page.dart'; // Import ini untuk mengakses kelas Ticket
+import 'package:intl/intl.dart';
 
-// Widget untuk layar detail tiket
 class TicketDetailScreen extends StatefulWidget {
-  final ProblemRequest request; // Menerima data laporan yang dipilih
+  // --- PERBAIKAN 1: Menggunakan kelas 'Ticket' yang benar ---
+  final Ticket ticket; 
 
-  const TicketDetailScreen({super.key, required this.request});
+  const TicketDetailScreen({super.key, required this.ticket});
 
   @override
   State<TicketDetailScreen> createState() => _TicketDetailScreenState();
 }
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
-  // --- STATE MANAGEMENT ---
+  // State untuk menyimpan perubahan pada dropdown
   late String _selectedStatus;
   late String _selectedPriority;
   late String _selectedCategory;
   late String _assignedTo;
   late bool _isResolved;
 
-  // Opsi untuk dropdown
+  // Opsi untuk dropdown, bisa Anda kembangkan lebih lanjut
   final List<String> _statusOptions = [
-    'New',
-    'Waiting Reply',
-    'Replied',
-    'On Hold',
-    'Resolved',
+    'New', 'In Progress', 'Waiting reply', 'On Hold', 'Resolved',
   ];
   final List<String> _priorityOptions = ['Critical', 'High', 'Medium', 'Low'];
   final List<String> _categoryOptions = [
-    'Software',
-    'Hardware',
-    'Jaringan',
-    'Fasilitas',
-    'Listrik',
-    'Umum',
+    'Software', 'Hardware', 'Jaringan', 'Fasilitas', 'Listrik', 'General',
   ];
   final List<String> _teamOptions = [
-    'Agus (Tim IT)',
-    'Budi (Tim Fasilitas)',
-    'Citra (Support)',
+    'Unassigned', 'Budiono Siregar', 'Bachtiar Simon', 'Rojali',
   ];
 
   @override
   void initState() {
     super.initState();
-
-    // Konversi status awal dari Bahasa Indonesia ke Bahasa Inggris jika perlu
-    switch (widget.request.status) {
-      case 'Baru':
-        _selectedStatus = 'New';
-        break;
-      case 'Diproses':
-        _selectedStatus = 'Replied'; // atau 'In Progress' jika ada di opsi baru
-        break;
-      case 'Selesai':
-        _selectedStatus = 'Resolved';
-        break;
-      default:
-        _selectedStatus = widget.request.status;
-    }
-
-    // Inisialisasi state berdasarkan data dari `widget.request`
-    _selectedPriority = widget.request.priority;
-    _selectedCategory = widget.request.category;
-    _assignedTo = 'Agus (Tim IT)'; // Placeholder
+    // --- PERBAIKAN 2: Inisialisasi state dari properti 'widget.ticket' ---
+    _selectedStatus = widget.ticket.statusText;
+    _selectedPriority = widget.ticket.priorityText;
+    _selectedCategory = widget.ticket.categoryName;
+    _assignedTo = widget.ticket.ownerName; // Mengambil data owner asli
     _isResolved = _selectedStatus == 'Resolved';
-  }
-
-  // --- UI HELPER METHODS ---
-
-  // Widget untuk baris berisi label dan dropdown
-  Widget _buildDropdownRow({
-    required String label,
-    required String value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              value: value,
-              isExpanded: true,
-              items: items.map((String item) {
-                return DropdownMenuItem<String>(
-                  value: item,
-                  child: Text(item, overflow: TextOverflow.ellipsis),
-                );
-              }).toList(),
-              onChanged: _isResolved ? null : onChanged,
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: _isResolved,
-                fillColor: Colors.grey[200],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Widget untuk baris informasi statis (Pelapor & Tanggal)
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey[600], size: 20),
-          const SizedBox(width: 12),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Text(value),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detail Laporan'),
+        // --- PERBAIKAN 3: Menggunakan properti yang benar dari 'ticket' ---
+        title: Text('Detail: ${widget.ticket.trackid}'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
@@ -149,20 +60,43 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             children: [
               // --- Bagian Judul Laporan ---
               Text(
-                widget.request.id, // Menggunakan data dari `request`
+                widget.ticket.categoryName,
                 style: TextStyle(
                   color: Theme.of(context).primaryColor,
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                  fontSize: 16,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                widget.request.title, // Menggunakan data dari `request`
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
+                widget.ticket.subject,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+              ),
+              const Divider(height: 24, thickness: 1),
+
+              // --- Bagian Info Pelapor ---
+              _buildInfoRow(Icons.person_outline, 'Pelapor', widget.ticket.requesterName),
+              _buildInfoRow(
+                Icons.person_pin_circle_outlined,
+                'Ditugaskan ke',
+                widget.ticket.ownerName,
+              ),
+              _buildInfoRow(
+                Icons.reply_outlined,
+                'Balasan Terakhir',
+                widget.ticket.lastReplierText,
+              ),
+              const Divider(height: 24, thickness: 1),
+              
+              _buildInfoRow(
+                Icons.calendar_today_outlined,
+                'Dibuat pada',
+                DateFormat('d MMM<y_bin_46>, HH:mm').format(widget.ticket.creationDate),
+              ),
+              _buildInfoRow(
+                Icons.edit_calendar_outlined,
+                'Terakhir Update',
+                DateFormat('d MMM<y_bin_46>, HH:mm').format(widget.ticket.lastChange),
               ),
               const Divider(height: 24, thickness: 1),
 
@@ -173,119 +107,115 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 items: _statusOptions,
                 onChanged: (newValue) {
                   setState(() {
-                    if (newValue != null) _selectedStatus = newValue;
+                    if (newValue != null) {
+                      _selectedStatus = newValue;
+                      _isResolved = newValue == 'Resolved';
+                    }
                   });
                 },
               ),
+              _buildDropdownRow(
+                label: 'Prioritas:',
+                value: _selectedPriority,
+                items: _priorityOptions,
+                onChanged: (newValue) => setState(() => _selectedPriority = newValue!),
+              ),
+              _buildDropdownRow(
+                label: 'Kategori:',
+                value: _selectedCategory,
+                items: _categoryOptions,
+                onChanged: (newValue) => setState(() => _selectedCategory = newValue!),
+              ),
+              _buildDropdownRow(
+                label: 'Tugaskan ke:',
+                value: _assignedTo,
+                items: _teamOptions,
+                onChanged: (newValue) => setState(() => _assignedTo = newValue!),
+              ),
+              const SizedBox(height: 24),
 
-              // Tombol "Tandai Selesai"
-              const SizedBox(height: 12),
+              // Tombol untuk menyimpan perubahan
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Tandai Selesai (Mark as Resolved)'),
+                  icon: const Icon(Icons.save_alt_outlined),
+                  label: const Text('Simpan Perubahan'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[600],
+                    backgroundColor: Colors.blue.shade800,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: _isResolved
-                      ? null
-                      : () {
-                          setState(() {
-                            _isResolved = true;
-                            _selectedStatus =
-                                'Resolved'; // <--- PERBAIKAN: Ubah menjadi 'Resolved'
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Laporan ditandai sebagai Selesai!',
-                              ),
-                            ),
-                          );
-                        },
+                  onPressed: () {
+                    // TODO: Tambahkan logika untuk mengirim update ke API
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Logika simpan belum diimplementasikan.')),
+                    );
+                  },
                 ),
-              ),
-              const SizedBox(height: 12),
-
-              _buildDropdownRow(
-                label: 'Priority:',
-                value: _selectedPriority,
-                items: _priorityOptions,
-                onChanged: (newValue) {
-                  setState(() {
-                    if (newValue != null) _selectedPriority = newValue;
-                  });
-                },
-              ),
-              _buildDropdownRow(
-                label: 'Category:',
-                value: _selectedCategory,
-                items: _categoryOptions,
-                onChanged: (newValue) {
-                  setState(() {
-                    if (newValue != null) _selectedCategory = newValue;
-                  });
-                },
-              ),
-              _buildDropdownRow(
-                label: 'Assigned to:',
-                value: _assignedTo,
-                items: _teamOptions,
-                onChanged: (newValue) {
-                  setState(() {
-                    if (newValue != null) _assignedTo = newValue;
-                  });
-                },
-              ),
-
-              const Divider(height: 32, thickness: 1),
-
-              // --- Bagian Info Pelapor ---
-              _buildInfoRow(
-                Icons.person_outline,
-                'Pelapor',
-                'Budi Santoso',
-              ), // Data statis
-              _buildInfoRow(
-                Icons.calendar_today_outlined,
-                'Terakhir Update',
-                widget.request.lastUpdate,
-              ),
-
-              const Divider(height: 32, thickness: 1),
-
-              // --- Bagian Deskripsi & Lampiran ---
-              const Text(
-                'Deskripsi Lengkap',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Laptop merk Dell milik saya tiba-tiba sangat lambat setelah update Windows terakhir. Beberapa aplikasi seperti Office dan Chrome sering not responding. Mohon bantuannya.',
-                style: TextStyle(fontSize: 15, height: 1.5),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Lampiran',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              const Row(
-                children: [
-                  Icon(Icons.image, color: Colors.blue, size: 50),
-                  SizedBox(width: 10),
-                  Icon(Icons.description, color: Colors.red, size: 50),
-                ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Helper widget untuk baris dropdown
+  Widget _buildDropdownRow({
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          ),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: value,
+              isExpanded: true,
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(value: item, child: Text(item, overflow: TextOverflow.ellipsis));
+              }).toList(),
+              onChanged: _isResolved ? null : onChanged,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                filled: _isResolved,
+                fillColor: Colors.grey[200],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget untuk baris info
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.grey[600], size: 20),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          const Spacer(),
+          Expanded(
+            child: Text(
+              value, 
+              style: TextStyle(color: Colors.grey.shade800, fontSize: 15),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

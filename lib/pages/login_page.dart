@@ -1,7 +1,6 @@
 import 'package:anri/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
 import 'dart:convert'; // <-- IMPORT BARU untuk JSON
 import 'dart:math' as math;
 import 'package:http/http.dart' as http; // <-- IMPORT BARU untuk HTTP
