@@ -9,12 +9,13 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Model data Ticket (tidak ada perubahan)
+// Model data Ticket yang sudah lengkap
 class Ticket {
   final int id;
   final String trackid;
   final String requesterName;
   final String subject;
+  final String message; // Field untuk deskripsi awal
   final DateTime creationDate;
   final DateTime lastChange;
   final String statusText;
@@ -22,12 +23,16 @@ class Ticket {
   final String categoryName;
   final String ownerName;
   final String lastReplierText;
+  final int replies;
+  final String timeWorked;
+  final DateTime? dueDate;
 
   Ticket({
     required this.id,
     required this.trackid,
     required this.requesterName,
     required this.subject,
+    required this.message,
     required this.creationDate,
     required this.lastChange,
     required this.statusText,
@@ -35,6 +40,9 @@ class Ticket {
     required this.categoryName,
     required this.ownerName,
     required this.lastReplierText,
+    required this.replies,
+    required this.timeWorked,
+    this.dueDate,
   });
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -43,6 +51,7 @@ class Ticket {
       trackid: json['trackid'] ?? 'N/A',
       requesterName: json['requester_name'] ?? 'Unknown User',
       subject: json['subject'] ?? 'No Subject',
+      message: json['message'] ?? '', // Parsing field message
       creationDate: DateTime.parse(json['creation_date']),
       lastChange: DateTime.parse(json['lastchange']),
       statusText: json['status_text'] ?? 'Unknown',
@@ -50,12 +59,22 @@ class Ticket {
       categoryName: json['category_name'] ?? 'Uncategorized',
       ownerName: json['owner_name'] ?? 'Unassigned',
       lastReplierText: json['last_replier_text'] ?? '-',
+      replies: json['replies'] as int? ?? 0,
+      timeWorked: json['time_worked'] ?? '00:00:00',
+      dueDate:
+          json['due_date'] != null ? DateTime.parse(json['due_date']) : null,
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  // --- PERBAIKAN 1: Menambahkan properti untuk menerima nama pengguna ---
+  final String currentUserName;
+
+  const HomePage({
+    super.key,
+    required this.currentUserName,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -74,9 +93,13 @@ class _HomePageState extends State<HomePage> {
   String? _error;
 
   final ScrollController _scrollController = ScrollController();
-  bool _isFabVisible = false; // Defaultnya disembunyikan
+  bool _isFabVisible = false;
   Timer? _autoRefreshTimer;
 
+  // State untuk menyimpan daftar anggota tim
+  List<String> _teamMembers = ['Unassigned'];
+
+  // Single source of truth untuk kategori
   final Map<String, String> _categories = {
     'All': 'Semua Kategori',
     '1': 'Aplikasi Sistem Informasi',
@@ -107,9 +130,9 @@ class _HomePageState extends State<HomePage> {
 
   String get baseUrl {
     if (kIsWeb) {
-      return 'http://localhost/anri_helpdesk_api';
+      return 'http://localhost:8080/anri_helpdesk_api';
     } else {
-      return 'http://10.0.2.2/anri_helpdesk_api';
+      return 'http://localhost:8080/anri_helpdesk_api';
     }
   }
 
@@ -117,20 +140,20 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _fetchInitialTickets();
-
-    // --- PERUBAHAN: Logika FAB disesuaikan dengan permintaan ---
-    // FAB akan muncul saat scroll ke bawah, dan sembunyi saat scroll ke atas.
+    _fetchTeamMembers(); // Panggil fungsi untuk mengambil daftar tim
     _scrollController.addListener(() {
       final direction = _scrollController.position.userScrollDirection;
       if (direction == ScrollDirection.reverse) {
-        // Scroll ke bawah
         if (!_isFabVisible) setState(() => _isFabVisible = true);
       } else if (direction == ScrollDirection.forward) {
-        // Scroll ke atas
         if (_isFabVisible) setState(() => _isFabVisible = false);
       }
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 200 &&
+          !_isLoadingMore) {
+        _loadMoreTickets();
+      }
     });
-
     _startAutoRefreshTimer();
   }
 
@@ -141,27 +164,41 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // --- PERUBAHAN: Logika Auto-Reload Cerdas ---
+  // Fungsi untuk mengambil daftar tim/staf dari API
+  Future<void> _fetchTeamMembers() async {
+    try {
+      final url = Uri.parse('$baseUrl/get_users.php');
+      final response = await http.get(url).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200 && mounted) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final List<String> fetchedMembers =
+              List<String>.from(responseData['data']);
+          setState(() {
+            _teamMembers =
+                fetchedMembers.isNotEmpty ? fetchedMembers : ['Unassigned'];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Gagal mengambil daftar tim: $e");
+    }
+  }
+
   void _startAutoRefreshTimer() {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (_selectedIndex == 0 && mounted) {
-        // Panggil fungsi yang hanya menambah data baru, bukan reload total
         _fetchLatestTicketsInBackground();
       }
     });
   }
 
-  /// (Fungsi Baru) Mengambil data terbaru di latar belakang dan hanya
-  /// menambahkan tiket yang benar-benar baru ke atas daftar.
   Future<void> _fetchLatestTicketsInBackground() async {
-    if (_isLoading || _isLoadingMore)
-      return; // Jangan refresh jika sedang ada proses loading
-
+    if (_isLoading || _isLoadingMore) return;
     String statusForAPI = _selectedStatus == 'Semua' ? 'All' : _selectedStatus;
     final url = Uri.parse(
       '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=1',
     );
-
     try {
       final response = await http.get(url).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200 && mounted) {
@@ -171,16 +208,12 @@ class _HomePageState extends State<HomePage> {
           final List<Ticket> fetchedTickets = ticketData
               .map((json) => Ticket.fromJson(json as Map<String, dynamic>))
               .toList();
-
           final existingTicketIds = _tickets.map((t) => t.id).toSet();
           final newUniqueTickets = fetchedTickets
               .where((t) => !existingTicketIds.contains(t.id))
               .toList();
-
           if (newUniqueTickets.isNotEmpty) {
-            setState(() {
-              _tickets.insertAll(0, newUniqueTickets);
-            });
+            setState(() => _tickets.insertAll(0, newUniqueTickets));
           }
         }
       }
@@ -189,7 +222,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// (Manual Reload) Memuat ulang seluruh daftar tiket (untuk pull-to-refresh).
   Future<void> _fetchInitialTickets() async {
     setState(() {
       _isLoading = true;
@@ -199,28 +231,21 @@ class _HomePageState extends State<HomePage> {
       _error = null;
     });
     await _fetchTickets(page: 1);
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  /// Memuat halaman selanjutnya saat scroll ke bawah.
   Future<void> _loadMoreTickets() async {
     if (_isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
     _currentPage++;
     await _fetchTickets(page: _currentPage);
-    if (mounted) {
-      setState(() => _isLoadingMore = false);
-    }
+    if (mounted) setState(() => _isLoadingMore = false);
   }
 
-  /// Fungsi utama untuk mengambil data dari API.
   Future<void> _fetchTickets({required int page}) async {
     String statusForAPI = _selectedIndex == 1
         ? 'Resolved'
         : (_selectedStatus == 'Semua' ? 'All' : _selectedStatus);
-
     final url = Uri.parse(
       '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=$page',
     );
@@ -255,8 +280,6 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-
-  // Sisa kode (widget build, dll.) tidak ada perubahan signifikan
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -294,7 +317,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _logout(BuildContext context) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', false);
+    await prefs.clear(); // Menghapus semua data sesi
+    await prefs.setBool('isLoggedIn', false); // Tetap set isLoggedIn ke false
+
     if (context.mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -313,6 +338,16 @@ class _HomePageState extends State<HomePage> {
         foregroundColor: Colors.black87,
         elevation: 1,
         actions: [
+          // Menampilkan nama user yang login di AppBar
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: Text(
+                'Hi, ${widget.currentUserName}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_outlined),
             tooltip: 'Logout',
@@ -386,7 +421,7 @@ class _HomePageState extends State<HomePage> {
       return _buildErrorState(_error!);
     }
     if (_selectedIndex == 2) {
-      return const Center(child: Text('Halaman Pengaturan'));
+      return Center(child: Text('Halaman Pengaturan untuk ${widget.currentUserName}'));
     }
     if (_tickets.isEmpty) {
       return _buildEmptyState();
@@ -401,34 +436,25 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Kategori',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('Kategori',
+              style:
+                  TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: _selectedCategory,
             isExpanded: true,
             decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
             items: _categories.entries.map((entry) {
               return DropdownMenuItem<String>(
                 value: entry.key,
-                child: Text(
-                  entry.value,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14),
-                ),
+                child: Text(entry.value,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14)),
               );
             }).toList(),
             onChanged: (newValue) {
@@ -439,13 +465,9 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           const SizedBox(height: 16),
-          Text(
-            'Status',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('Status',
+              style:
+                  TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -463,9 +485,8 @@ class _HomePageState extends State<HomePage> {
                         _fetchInitialTickets();
                       }
                     },
-                    selectedColor: Theme.of(
-                      context,
-                    ).primaryColor.withOpacity(0.15),
+                    selectedColor:
+                        Theme.of(context).primaryColor.withOpacity(0.15),
                     labelStyle: TextStyle(
                       fontSize: 13,
                       color: isSelected
@@ -474,10 +495,9 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.w500,
                     ),
                     side: BorderSide(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey.shade300,
-                    ),
+                        color: isSelected
+                            ? Theme.of(context).primaryColor
+                            : Colors.grey.shade300),
                   ),
                 );
               }).toList(),
@@ -491,8 +511,8 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildTicketList() {
     bool isHomePage = _selectedIndex == 0;
-    int itemCount = (isHomePage ? 1 : 0) + _tickets.length + (_hasMore ? 1 : 0);
-
+    int itemCount =
+        (isHomePage ? 1 : 0) + _tickets.length + (_isLoadingMore ? 1 : 0);
     return RefreshIndicator(
       onRefresh: _fetchInitialTickets,
       child: ListView.builder(
@@ -508,9 +528,20 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: _buildTicketCard(_tickets[ticketIndex]),
             );
-          } else {
-            return _buildLoadingMoreIndicator();
+          } else if (_isLoadingMore) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.0),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          } else if (!_hasMore) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0),
+              child: Center(
+                  child: Text('-- Akhir dari daftar --',
+                      style: TextStyle(color: Colors.grey))),
+            );
           }
+          return const SizedBox.shrink();
         },
       ),
     );
@@ -527,13 +558,28 @@ class _HomePageState extends State<HomePage> {
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.05),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          final categoryNames = _categories.entries
+              .where((entry) => entry.key != 'All')
+              .map((entry) => entry.value)
+              .toList();
+
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TicketDetailScreen(ticket: ticket),
+              builder: (context) => TicketDetailScreen(
+                ticket: ticket,
+                allCategories: categoryNames,
+                allTeamMembers: _teamMembers,
+                // --- PERBAIKAN 2: Mengirim nama pengguna ke halaman detail ---
+                currentUserName: widget.currentUserName,
+              ),
             ),
           );
+
+          if (result == true) {
+            _fetchInitialTickets();
+          }
         },
         borderRadius: BorderRadius.circular(11),
         child: Padding(
@@ -553,10 +599,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: _getStatusColor(ticket.statusText),
                       borderRadius: BorderRadius.circular(20),
@@ -564,37 +608,31 @@ class _HomePageState extends State<HomePage> {
                     child: Text(
                       ticket.statusText,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    Icons.flag,
-                    color: _getPriorityColor(ticket.priorityText),
-                    size: 20,
-                  ),
+                  Icon(Icons.flag,
+                      color: _getPriorityColor(ticket.priorityText), size: 20),
                 ],
               ),
               const SizedBox(height: 12),
               Text(
                 ticket.subject,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black87,
-                ),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.black87),
               ),
               const SizedBox(height: 4),
               Text(
                 'Kategori: ${ticket.categoryName}',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
-                ),
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                    fontStyle: FontStyle.italic),
               ),
               const Divider(height: 24),
               _buildDetailRow('Requester', ticket.requesterName),
@@ -617,10 +655,8 @@ class _HomePageState extends State<HomePage> {
       children: [
         SizedBox(
           width: 90,
-          child: Text(
-            '$label:',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          ),
+          child: Text('$label:',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
         ),
         Expanded(
           child: Text(
@@ -633,31 +669,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildLoadingMoreIndicator() {
-    if (_hasMore) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        child: _isLoadingMore
-            ? const Center(child: CircularProgressIndicator())
-            : Center(
-                child: TextButton(
-                  onPressed: _loadMoreTickets,
-                  child: const Text('Muat Lebih Banyak'),
-                ),
-              ),
-      );
-    }
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 24.0),
-      child: Center(
-        child: Text(
-          '-- Akhir dari daftar --',
-          style: TextStyle(color: Colors.grey),
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -665,20 +676,15 @@ class _HomePageState extends State<HomePage> {
         children: [
           Icon(Icons.inbox_outlined, size: 80, color: Colors.grey.shade400),
           const SizedBox(height: 16),
-          Text(
-            'Tidak Ada Tiket',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
-            ),
-          ),
+          Text('Tidak Ada Tiket',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade600)),
           const SizedBox(height: 8),
-          Text(
-            'Belum ada tiket yang cocok dengan filter.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
-          ),
+          Text('Belum ada tiket yang cocok dengan filter.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade500)),
         ],
       ),
     );
@@ -691,18 +697,15 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.wifi_off_outlined, size: 80, color: Colors.red.shade300),
+            Icon(Icons.wifi_off_outlined,
+                size: 80, color: Colors.red.shade300),
             const SizedBox(height: 16),
-            const Text(
-              'Oops, Terjadi Kesalahan',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
+            const Text('Oops, Terjadi Kesalahan',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-            ),
+            Text(error,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _fetchInitialTickets,
@@ -732,51 +735,40 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Filter Tiket',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Filter Tiket',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
                   DropdownButtonFormField<String>(
                     value: tempCategory,
                     decoration: const InputDecoration(
-                      labelText: 'Kategori',
-                      border: OutlineInputBorder(),
-                    ),
+                        labelText: 'Kategori', border: OutlineInputBorder()),
                     items: _categories.entries
-                        .map(
-                          (entry) => DropdownMenuItem<String>(
-                            value: entry.key,
-                            child: Text(
-                              entry.value,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
+                        .map((entry) => DropdownMenuItem<String>(
+                              value: entry.key,
+                              child: Text(entry.value,
+                                  overflow: TextOverflow.ellipsis),
+                            ))
                         .toList(),
                     onChanged: (newValue) {
-                      if (newValue != null)
+                      if (newValue != null) {
                         setModalState(() => tempCategory = newValue);
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: tempStatus,
                     decoration: const InputDecoration(
-                      labelText: 'Status',
-                      border: OutlineInputBorder(),
-                    ),
+                        labelText: 'Status', border: OutlineInputBorder()),
                     items: _statusFilters
-                        .map(
-                          (status) => DropdownMenuItem<String>(
-                            value: status,
-                            child: Text(status),
-                          ),
-                        )
+                        .map((status) => DropdownMenuItem<String>(
+                            value: status, child: Text(status)))
                         .toList(),
                     onChanged: (newValue) {
-                      if (newValue != null)
+                      if (newValue != null) {
                         setModalState(() => tempStatus = newValue);
+                      }
                     },
                   ),
                   const SizedBox(height: 24),

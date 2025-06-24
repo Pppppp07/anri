@@ -2,8 +2,18 @@
 // Sertakan file koneksi database
 require 'koneksi.php';
 
-// Set header sebagai JSON karena kita akan mengirim respons dalam format JSON
+// PERBAIKAN 3: Menangani CORS Pre-flight request dari browser
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization");
+    exit(0);
+}
+
+// Set header sebagai JSON
 header('Content-Type: application/json');
+header("Access-Control-Allow-Origin: *");
+
 
 // Buat array untuk respons
 $response = array();
@@ -13,10 +23,11 @@ $data = json_decode(file_get_contents("php://input"));
 
 // Pastikan data yang dibutuhkan ada
 if (isset($data->username) && isset($data->password)) {
-    $username = mysqli_real_escape_string($conn, $data->username);
+    // PERBAIKAN 2: mysqli_real_escape_string tidak diperlukan saat menggunakan prepared statements
+    $username = $data->username;
     $password = $data->password;
 
-    // --- PENTING: Menggunakan Prepared Statements untuk Keamanan (Mencegah SQL Injection) ---
+    // Menggunakan Prepared Statements untuk Keamanan (Mencegah SQL Injection)
     $sql = "SELECT id, `user`, `pass`, `name`, `email` FROM `hesk_users` WHERE `user` = ?";
     
     // Siapkan statement
@@ -36,13 +47,14 @@ if (isset($data->username) && isset($data->password)) {
         $row = mysqli_fetch_assoc($result);
         
         // Verifikasi password yang diinput dengan hash di database
-        // Ingat, database Anda menggunakan hashing BCrypt
         if (password_verify($password, $row['pass'])) {
             // Jika password cocok
             $response['success'] = true;
             $response['message'] = "Login berhasil!";
-            $response['data'] = array(
-                'id' => $row['id'],
+            
+            // PERBAIKAN 1: Mengganti kunci 'data' menjadi 'user_data' agar sesuai dengan Flutter
+            $response['user_data'] = array(
+                'id' => (int)$row['id'], // Pastikan ID adalah integer
                 'name' => $row['name'],
                 'email' => $row['email'],
                 'username' => $row['user']

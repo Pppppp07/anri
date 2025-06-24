@@ -43,6 +43,7 @@ dependencies:
   http: ^1.2.1 
 
   timeago: ^3.6.1
+  flutter_html: ^3.0.0
 
 dev_dependencies:
   flutter_test:
