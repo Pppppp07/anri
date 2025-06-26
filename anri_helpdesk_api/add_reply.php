@@ -2,6 +2,11 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+
+// AMANKAN ENDPOINT INI
+require 'auth_check.php';
+
+// Sertakan file koneksi database
 require 'koneksi.php';
 
 header("Access-Control-Allow-Origin: *");

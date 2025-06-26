@@ -27,8 +27,9 @@ class _SplashScreenState extends State<SplashScreen>
     _checkLoginStatus();
   }
 
-  // --- FUNGSI DICEK DAN DIPERBAIKI ---
+  // --- FUNGSI DIPERBAIKI SECARA TOTAL ---
   Future<void> _checkLoginStatus() async {
+    // Beri jeda agar splash screen terlihat
     await Future.delayed(const Duration(seconds: 3));
 
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -36,20 +37,24 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (mounted) {
       if (isLoggedIn) {
-        // PERBAIKAN: Baca nama pengguna yang tersimpan dari SharedPreferences
-        final String? currentUserName = prefs.getString('user_name');
+        // PERBAIKAN: Baca NAMA PENGGUNA dan TOKEN OTENTIKASI
+        final String? userName = prefs.getString('user_name');
+        final String? authToken = prefs.getString('auth_token');
 
-        if (currentUserName != null && currentUserName.isNotEmpty) {
-          // Jika ada nama pengguna, langsung ke HomePage dan kirim datanya
+        // Navigasi ke HomePage HANYA JIKA kedua data penting ini ada
+        if (userName != null && authToken != null) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => HomePage(currentUserName: currentUserName),
+              builder: (context) => HomePage(
+                currentUserName: userName,
+                authToken: authToken, // Kirim token juga
+              ),
             ),
           );
         } else {
-          // Jika status login true tapi nama tidak ada (state tidak konsisten),
-          // lebih aman arahkan kembali ke LoginPage untuk login ulang.
+          // Jika salah satu data sesi (nama atau token) tidak ada,
+          // anggap sesi tidak valid dan paksa login ulang.
           _navigateToLogin();
         }
       } else {
@@ -72,7 +77,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
   }
-  // --- AKHIR FUNGSI CEK LOGIN ---
 
   @override
   void dispose() {

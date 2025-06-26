@@ -1,8 +1,20 @@
 <?php
-// Sertakan file koneksi database
+// --- HEADER CORS UNTUK MENGIZINKAN AKSES DARI FLUTTER WEB ---
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+// Menangani Pre-flight Request (penting untuk browser)
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require 'koneksi.php';
 
-// PERBAIKAN 3: Menangani CORS Pre-flight request dari browser
+// Menangani CORS Pre-flight request
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
@@ -10,78 +22,94 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
 
-// Set header sebagai JSON
 header('Content-Type: application/json');
 header("Access-Control-Allow-Origin: *");
 
-
-// Buat array untuk respons
 $response = array();
-
-// Menerima data JSON yang dikirim dari Flutter
 $data = json_decode(file_get_contents("php://input"));
 
-// Pastikan data yang dibutuhkan ada
 if (isset($data->username) && isset($data->password)) {
-    // PERBAIKAN 2: mysqli_real_escape_string tidak diperlukan saat menggunakan prepared statements
     $username = $data->username;
     $password = $data->password;
 
-    // Menggunakan Prepared Statements untuk Keamanan (Mencegah SQL Injection)
     $sql = "SELECT id, `user`, `pass`, `name`, `email` FROM `hesk_users` WHERE `user` = ?";
-    
-    // Siapkan statement
     $stmt = mysqli_prepare($conn, $sql);
-    
-    // Bind parameter
     mysqli_stmt_bind_param($stmt, "s", $username);
-    
-    // Eksekusi statement
     mysqli_stmt_execute($stmt);
-    
-    // Dapatkan hasilnya
     $result = mysqli_stmt_get_result($stmt);
 
     if (mysqli_num_rows($result) > 0) {
-        // Jika user ditemukan, ambil datanya
         $row = mysqli_fetch_assoc($result);
         
-        // Verifikasi password yang diinput dengan hash di database
         if (password_verify($password, $row['pass'])) {
-            // Jika password cocok
-            $response['success'] = true;
-            $response['message'] = "Login berhasil!";
-            
-            // PERBAIKAN 1: Mengganti kunci 'data' menjadi 'user_data' agar sesuai dengan Flutter
-            $response['user_data'] = array(
-                'id' => (int)$row['id'], // Pastikan ID adalah integer
-                'name' => $row['name'],
-                'email' => $row['email'],
-                'username' => $row['user']
-            );
+            // --- PERUBAHAN UTAMA: MENAMBAHKAN TRY-CATCH UNTUK MENANGKAP ERROR ---
+            try {
+                // Jika password cocok, buat token
+                $user_id = $row['id'];
+                $selector = bin2hex(random_bytes(8));
+                $validator = bin2hex(random_bytes(32));
+                $hashed_validator = hash('sha256', $validator);
+                $expires = date('Y-m-d H:i:s', time() + (30 * 24 * 60 * 60));
+
+                // Mulai transaction untuk memastikan semua query berhasil
+                mysqli_begin_transaction($conn);
+
+                // Hapus token lama untuk user ini
+                $delete_old_sql = "DELETE FROM `hesk_auth_tokens` WHERE `user_id` = ?";
+                $stmt_delete = mysqli_prepare($conn, $delete_old_sql);
+                mysqli_stmt_bind_param($stmt_delete, "i", $user_id);
+                mysqli_stmt_execute($stmt_delete);
+                mysqli_stmt_close($stmt_delete);
+
+                // Masukkan token baru
+                $sql_token = "INSERT INTO `hesk_auth_tokens` (`selector`, `token`, `user_id`, `expires`) VALUES (?, ?, ?, ?)";
+                $stmt_token = mysqli_prepare($conn, $sql_token);
+                mysqli_stmt_bind_param($stmt_token, "ssis", $selector, $hashed_validator, $user_id, $expires);
+                
+                // Jika insert gagal, lemparkan exception
+                if (!mysqli_stmt_execute($stmt_token)) {
+                    throw new Exception(mysqli_stmt_error($stmt_token));
+                }
+                mysqli_stmt_close($stmt_token);
+                
+                // Jika semua query berhasil, commit transaction
+                mysqli_commit($conn);
+                
+                // Jika berhasil sampai sini, baru siapkan respons sukses
+                $response['success'] = true;
+                $response['message'] = "Login berhasil!";
+                $response['user_data'] = array(
+                    'id' => (int)$row['id'],
+                    'name' => $row['name'],
+                    'email' => $row['email'],
+                    'username' => $row['user']
+                );
+                $response['token'] = $selector . ':' . $validator;
+
+            } catch (Exception $e) {
+                mysqli_rollback($conn); // Batalkan semua query jika ada yg gagal
+                $response['success'] = false;
+                // Pesan error sekarang akan lebih spesifik!
+                $response['message'] = "Gagal membuat sesi token: " . $e->getMessage();
+            }
+            // --- AKHIR DARI PERUBAHAN ---
+
         } else {
-            // Jika password salah
             $response['success'] = false;
             $response['message'] = "Username atau password salah.";
         }
     } else {
-        // Jika user tidak ditemukan
         $response['success'] = false;
         $response['message'] = "Username tidak ditemukan.";
     }
     
-    // Tutup statement
     mysqli_stmt_close($stmt);
 
 } else {
-    // Jika data tidak lengkap
     $response['success'] = false;
     $response['message'] = "Data tidak lengkap.";
 }
 
-// Tutup koneksi
 mysqli_close($conn);
-
-// Kembalikan respons dalam format JSON
 echo json_encode($response);
 ?>

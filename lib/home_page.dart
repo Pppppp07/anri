@@ -9,13 +9,13 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Model data Ticket yang sudah lengkap
+// Model data Ticket (tidak berubah)
 class Ticket {
   final int id;
   final String trackid;
   final String requesterName;
   final String subject;
-  final String message; // Field untuk deskripsi awal
+  final String message;
   final DateTime creationDate;
   final DateTime lastChange;
   final String statusText;
@@ -51,7 +51,7 @@ class Ticket {
       trackid: json['trackid'] ?? 'N/A',
       requesterName: json['requester_name'] ?? 'Unknown User',
       subject: json['subject'] ?? 'No Subject',
-      message: json['message'] ?? '', // Parsing field message
+      message: json['message'] ?? '',
       creationDate: DateTime.parse(json['creation_date']),
       lastChange: DateTime.parse(json['lastchange']),
       statusText: json['status_text'] ?? 'Unknown',
@@ -68,12 +68,12 @@ class Ticket {
 }
 
 class HomePage extends StatefulWidget {
-  // --- PERBAIKAN 1: Menambahkan properti untuk menerima nama pengguna ---
   final String currentUserName;
-
+  final String authToken;
   const HomePage({
     super.key,
     required this.currentUserName,
+    required this.authToken,
   });
 
   @override
@@ -96,10 +96,8 @@ class _HomePageState extends State<HomePage> {
   bool _isFabVisible = false;
   Timer? _autoRefreshTimer;
 
-  // State untuk menyimpan daftar anggota tim
   List<String> _teamMembers = ['Unassigned'];
 
-  // Single source of truth untuk kategori
   final Map<String, String> _categories = {
     'All': 'Semua Kategori',
     '1': 'Aplikasi Sistem Informasi',
@@ -120,27 +118,18 @@ class _HomePageState extends State<HomePage> {
   };
 
   final List<String> _statusFilters = [
-    'Semua',
-    'New',
-    'Waiting Reply',
-    'Replied',
-    'In Progress',
-    'On Hold',
+    'Semua', 'New', 'Waiting Reply', 'Replied', 'In Progress', 'On Hold',
   ];
 
   String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:8080/anri_helpdesk_api';
-    } else {
-      return 'http://localhost:8080/anri_helpdesk_api';
-    }
+    // Pastikan IP Address ini bisa diakses dari perangkat Anda
+    return 'http://127.0.0.1:8080/anri_helpdesk_api';
   }
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialTickets();
-    _fetchTeamMembers(); // Panggil fungsi untuk mengambil daftar tim
+    _fetchInitialData();
     _scrollController.addListener(() {
       final direction = _scrollController.position.userScrollDirection;
       if (direction == ScrollDirection.reverse) {
@@ -156,6 +145,15 @@ class _HomePageState extends State<HomePage> {
     });
     _startAutoRefreshTimer();
   }
+  
+  Future<void> _fetchInitialData() async {
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _fetchTeamMembers(),
+      _fetchTickets(page: 1),
+    ]);
+    if (mounted) setState(() => _isLoading = false);
+  }
 
   @override
   void dispose() {
@@ -164,11 +162,34 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Fungsi untuk mengambil daftar tim/staf dari API
+  // --- FUNGSI BARU: Untuk membuat header otentikasi ---
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('auth_token');
+
+    if (token == null) {
+      if(mounted) {
+        _logout(context, message: 'Sesi Anda telah berakhir, silakan login kembali.');
+      }
+      return {};
+    }
+    return {'Authorization': 'Bearer $token'};
+  }
+
   Future<void> _fetchTeamMembers() async {
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty && mounted) return;
+
     try {
       final url = Uri.parse('$baseUrl/get_users.php');
-      final response = await http.get(url).timeout(const Duration(seconds: 15));
+      final response =
+          await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 401) {
+        if(mounted) _logout(context, message: 'Sesi tidak valid.');
+        return;
+      }
+
       if (response.statusCode == 200 && mounted) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
@@ -195,12 +216,17 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchLatestTicketsInBackground() async {
     if (_isLoading || _isLoadingMore) return;
+
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty && mounted) return;
+
     String statusForAPI = _selectedStatus == 'Semua' ? 'All' : _selectedStatus;
     final url = Uri.parse(
-      '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=1',
-    );
+        '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=1');
+
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 15));
+      final response =
+          await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200 && mounted) {
         final Map<String, dynamic> responseData = json.decode(response.body);
         if (responseData['success'] == true) {
@@ -243,14 +269,26 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchTickets({required int page}) async {
-    String statusForAPI = _selectedIndex == 1
-        ? 'Resolved'
-        : (_selectedStatus == 'Semua' ? 'All' : _selectedStatus);
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty && mounted) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    String statusForAPI =
+        _selectedIndex == 1 ? 'Resolved' : (_selectedStatus == 'Semua' ? 'All' : _selectedStatus);
     final url = Uri.parse(
-      '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=$page',
-    );
+        '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=$page');
+
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 20));
+      final response =
+          await http.get(url, headers: headers).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 401) {
+        if (mounted) _logout(context, message: 'Sesi Anda tidak valid. Silakan login kembali.');
+        return;
+      }
+
       if (response.statusCode == 200 && mounted) {
         final Map<String, dynamic> responseData = json.decode(response.body);
         if (responseData['success'] == true) {
@@ -271,8 +309,7 @@ class _HomePageState extends State<HomePage> {
         }
       } else {
         throw Exception(
-          'Gagal terhubung ke server (Kode: ${response.statusCode})',
-        );
+            'Gagal terhubung ke server (Kode: ${response.statusCode})');
       }
     } catch (e) {
       if (mounted) {
@@ -281,51 +318,46 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _logout(BuildContext context, {String? message}) async {
+    if (!mounted) return;
+    
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (Route<dynamic> route) => false,
+        );
+        if (message != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message), backgroundColor: Colors.red));
+        }
+      }
+    });
+  }
+
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'New':
-        return const Color(0xFFD32F2F);
-      case 'Waiting Reply':
-        return const Color(0xFFE65100);
-      case 'Replied':
-        return const Color(0xFF1976D2);
-      case 'In Progress':
-        return const Color(0xFF673AB7);
-      case 'On Hold':
-        return const Color(0xFFC2185B);
-      case 'Resolved':
-        return const Color(0xFF388E3C);
-      default:
-        return Colors.grey.shade700;
+      case 'New': return const Color(0xFFD32F2F);
+      case 'Waiting Reply': return const Color(0xFFE65100);
+      case 'Replied': return const Color(0xFF1976D2);
+      case 'In Progress': return const Color(0xFF673AB7);
+      case 'On Hold': return const Color(0xFFC2185B);
+      case 'Resolved': return const Color(0xFF388E3C);
+      default: return Colors.grey.shade700;
     }
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority) {
-      case 'Critical':
-        return const Color(0xFFD32F2F);
-      case 'High':
-        return const Color(0xFFEF6C00);
-      case 'Medium':
-        return const Color(0xFF689F38);
-      case 'Low':
-        return const Color(0xFF0288D1);
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Future<void> _logout(BuildContext context) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Menghapus semua data sesi
-    await prefs.setBool('isLoggedIn', false); // Tetap set isLoggedIn ke false
-
-    if (context.mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (Route<dynamic> route) => false,
-      );
+      case 'Critical': return const Color(0xFFD32F2F);
+      case 'High': return const Color(0xFFEF6C00);
+      case 'Medium': return const Color(0xFF689F38);
+      case 'Low': return const Color(0xFF0288D1);
+      default: return Colors.grey;
     }
   }
 
@@ -338,7 +370,6 @@ class _HomePageState extends State<HomePage> {
         foregroundColor: Colors.black87,
         elevation: 1,
         actions: [
-          // Menampilkan nama user yang login di AppBar
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 8.0),
@@ -409,7 +440,7 @@ class _HomePageState extends State<HomePage> {
     } else if (_selectedIndex == 1) {
       return const Text('Riwayat Tiket Selesai');
     } else {
-      return const Text('Pengaturan');
+      return Text('Pengaturan: ${widget.currentUserName}');
     }
   }
 
@@ -421,7 +452,8 @@ class _HomePageState extends State<HomePage> {
       return _buildErrorState(_error!);
     }
     if (_selectedIndex == 2) {
-      return Center(child: Text('Halaman Pengaturan untuk ${widget.currentUserName}'));
+      return Center(
+          child: Text('Halaman Pengaturan untuk ${widget.currentUserName}'));
     }
     if (_tickets.isEmpty) {
       return _buildEmptyState();
@@ -437,8 +469,8 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Kategori',
-              style:
-                  TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: _selectedCategory,
@@ -466,8 +498,8 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 16),
           Text('Status',
-              style:
-                  TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -571,7 +603,6 @@ class _HomePageState extends State<HomePage> {
                 ticket: ticket,
                 allCategories: categoryNames,
                 allTeamMembers: _teamMembers,
-                // --- PERBAIKAN 2: Mengirim nama pengguna ke halaman detail ---
                 currentUserName: widget.currentUserName,
               ),
             ),
@@ -599,8 +630,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const Spacer(),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: _getStatusColor(ticket.statusText),
                       borderRadius: BorderRadius.circular(20),

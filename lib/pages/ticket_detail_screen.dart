@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:anri/models/reply_models.dart';
 import 'package:anri/home_page.dart';
+import 'package:anri/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Ticket ticket;
@@ -27,7 +29,6 @@ class TicketDetailScreen extends StatefulWidget {
 }
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
-  // --- FIX: MENGEMBALIKAN SEMUA STATE & FUNGSI YANG HILANG ---
   final _scrollController = ScrollController();
   final _replyFormKey = GlobalKey();
 
@@ -35,7 +36,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Timer? _stopwatchTimer;
   bool _isStopwatchRunning = false;
   late Duration _workedDuration;
-  
+
   // State lainnya
   late String _selectedStatus;
   late String _selectedPriority;
@@ -67,7 +68,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     _assignedTo = widget.ticket.ownerName;
     _dueDate = widget.ticket.dueDate;
     _isResolved = _selectedStatus == 'Resolved';
-    _workedDuration = _parseDuration(widget.ticket.timeWorked); // Inisialisasi durasi
+    _workedDuration = _parseDuration(widget.ticket.timeWorked);
     _fetchTicketDetails();
   }
 
@@ -75,9 +76,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   void dispose() {
     _replyMessageController.dispose();
     _scrollController.dispose();
-    _stopwatchTimer?.cancel(); // Pastikan timer berhenti
+    _stopwatchTimer?.cancel();
     super.dispose();
   }
+
+  // --- FUNGSI-FUNGSI LOGIC & KEAMANAN ---
 
   Duration _parseDuration(String time) {
     final parts = time.split(':');
@@ -117,41 +120,66 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       _isStopwatchRunning = !_isStopwatchRunning;
     });
   }
-
+  
   void _scrollToReplyForm() {
     final context = _replyFormKey.currentContext;
     if (context != null) {
-      Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
+      Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
     }
+  }
+
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('auth_token');
+    if (token == null) {
+      if (mounted) _logout(message: 'Sesi tidak valid. Silakan login kembali.');
+      return {};
+    }
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<void> _logout({String? message}) async {
+    if (!mounted) return;
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
+        if (message != null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+        }
+      }
+    });
   }
 
   Future<void> _fetchTicketDetails() async {
     setState(() => _isLoadingDetails = true);
-    final url = Uri.parse(
-        'http://192.168.1.11:8080/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}');
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty) { setState(() => _isLoadingDetails = false); return; }
+
+    final url = Uri.parse('http://127.0.0.1:8080/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 15));
-      if (mounted && response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          final List<dynamic> repliesData = responseData['replies'];
-          setState(() {
-            _replies = repliesData.map((data) => Reply.fromJson(data)).toList();
-            _isLoadingDetails = false;
-          });
-        } else {
-          throw Exception('Gagal memuat detail dari API.');
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      if (mounted) {
+        if (response.statusCode == 401) { _logout(message: 'Sesi tidak valid.'); return; }
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          if (responseData['success'] == true) {
+            final List<dynamic> repliesData = responseData['replies'];
+            setState(() {
+              _replies = repliesData.map((data) => Reply.fromJson(data)).toList();
+              _isLoadingDetails = false;
+            });
+          } else {
+            throw Exception('Gagal memuat detail dari API.');
+          }
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingDetails = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error memuat riwayat balasan: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error memuat riwayat balasan: $e')));
       }
     }
   }
@@ -159,8 +187,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
     final finalTimeWorked = _formatDuration(_workedDuration);
-    final url =
-        Uri.parse('http://192.168.1.11:8080/anri_helpdesk_api/update_ticket.php');
+    final url = Uri.parse('http://127.0.0.1:8080/anri_helpdesk_api/update_ticket.php');
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty) { setState(() => _isSaving = false); return; }
+
     final Map<String, String> body = {
       'ticket_id': widget.ticket.id.toString(),
       'status': _selectedStatus,
@@ -168,30 +198,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       'category_name': _selectedCategory,
       'owner_name': _assignedTo,
       'time_worked': finalTimeWorked,
-      'due_date': _dueDate != null
-          ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_dueDate!)
-          : '',
+      'due_date': _dueDate != null ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_dueDate!) : '',
     };
     try {
-      final response =
-          await http.post(url, body: body).timeout(const Duration(seconds: 15));
+      final response = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 15));
       if (mounted) {
+        if (response.statusCode == 401) { _logout(message: 'Sesi tidak valid.'); return; }
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Perubahan berhasil disimpan!'),
-              backgroundColor: Colors.green));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Perubahan berhasil disimpan!'), backgroundColor: Colors.green));
           Navigator.pop(context, true);
         } else {
-          throw Exception(
-              responseData['message'] ?? 'Gagal menyimpan perubahan.');
+          throw Exception(responseData['message'] ?? 'Gagal menyimpan perubahan.');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -200,16 +223,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   Future<void> _submitReply() async {
     if (_replyMessageController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Pesan balasan tidak boleh kosong.'),
-          backgroundColor: Colors.orange));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pesan balasan tidak boleh kosong.'), backgroundColor: Colors.orange));
       return;
     }
     setState(() => _isSubmittingReply = true);
-    final url =
-        Uri.parse('http://192.168.1.11:8080/anri_helpdesk_api/add_reply.php');
+    final url = Uri.parse('http://127.0.0.1:8080/anri_helpdesk_api/add_reply.php');
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty) { setState(() => _isSubmittingReply = false); return; }
+
     try {
-      final response = await http.post(url, body: {
+      final response = await http.post(url, headers: headers, body: {
         'ticket_id': widget.ticket.id.toString(),
         'message': _replyMessageController.text,
         'new_status': _submitAsAction,
@@ -217,11 +240,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         'staff_name': widget.currentUserName,
       }).timeout(const Duration(seconds: 20));
       if (mounted) {
+        if (response.statusCode == 401) { _logout(message: 'Sesi tidak valid.'); return; }
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Balasan berhasil dikirim!'),
-              backgroundColor: Colors.green));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Balasan berhasil dikirim!'), backgroundColor: Colors.green));
           Navigator.pop(context, true);
         } else {
           throw Exception(responseData['message'] ?? 'Gagal mengirim balasan.');
@@ -229,9 +251,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isSubmittingReply = false);
@@ -250,10 +270,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       context: context,
       isScrollControlled: true,
       builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16, right: 16, top: 16,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,23 +307,47 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       ),
     );
   }
-
+  
   Widget _buildTimeInput({required TextEditingController controller, required String label}) {
     return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-    );
+        controller: controller,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(2)
+        ],
+        decoration: InputDecoration(
+            labelText: label, border: const OutlineInputBorder()));
   }
 
   Future<void> _showDueDateEditor() async {
-    final pickedDate = await showDatePicker(context: context, initialDate: _dueDate ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+    final pickedDate = await showDatePicker(
+        context: context,
+        initialDate: _dueDate ?? DateTime.now(),
+        firstDate: DateTime(2020),
+        lastDate: DateTime(2030));
     if (pickedDate == null || !mounted) return;
-    final pickedTime = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_dueDate ?? DateTime.now()));
+    final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_dueDate ?? DateTime.now()));
     if (pickedTime != null) {
-      setState(() => _dueDate = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute));
+      setState(() => _dueDate = DateTime(pickedDate.year, pickedDate.month,
+          pickedDate.day, pickedTime.hour, pickedTime.minute));
     }
+  }
+
+  void _assignToMe() {
+    if (_assignedTo == widget.currentUserName) return;
+    setState(() => _assignedTo = widget.currentUserName);
+    _saveChanges();
+  }
+
+  void _markAsResolved() {
+    setState(() {
+      _selectedStatus = 'Resolved';
+      _isResolved = true;
+    });
+    _saveChanges();
   }
 
   Color _getStatusColor(String status) {
@@ -331,25 +372,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  void _assignToMe() {
-    if (_assignedTo == widget.currentUserName) return;
-    setState(() => _assignedTo = widget.currentUserName);
-    _saveChanges();
-  }
-
-  void _markAsResolved() {
-    setState(() {
-      _selectedStatus = 'Resolved';
-      _isResolved = true;
-    });
-    _saveChanges();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.ticket.subject, style: const TextStyle(fontSize: 18), overflow: TextOverflow.ellipsis),
+        title: Text('Ticket #${widget.ticket.trackid}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -376,12 +403,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             const SizedBox(height: 16),
             Card(
               elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade200)),
               clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   _buildCollapsibleDescription(),
-                  if (_replies.isNotEmpty || !_isLoadingDetails) const Divider(height: 1, thickness: 1),
+                  if (_replies.isNotEmpty || !_isLoadingDetails)
+                    const Divider(height: 1, thickness: 1),
                   _buildCollapsibleReplies(),
                 ],
               ),
@@ -399,7 +429,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   children: [
                     TextFormField(
                       controller: _replyMessageController,
-                      decoration: const InputDecoration(hintText: 'Type your message...', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                          hintText: 'Type your message...',
+                          border: OutlineInputBorder()),
                       maxLines: 8,
                       minLines: 5,
                     ),
@@ -411,16 +443,32 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             value: _submitAsAction,
-                            items: _submitAsOptions.map((v) => DropdownMenuItem<String>(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(),
-                            onChanged: (v) => setState(() { if (v != null) _submitAsAction = v; }),
-                            decoration: const InputDecoration(labelText: 'Submit as', border: OutlineInputBorder()),
+                            items: _submitAsOptions
+                                .map((v) => DropdownMenuItem<String>(
+                                    value: v,
+                                    child: Text(v,
+                                        overflow: TextOverflow.ellipsis)))
+                                .toList(),
+                            onChanged: (v) => setState(() {
+                              if (v != null) _submitAsAction = v;
+                            }),
+                            decoration: const InputDecoration(
+                                labelText: 'Submit as',
+                                border: OutlineInputBorder()),
                           ),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: _isSubmittingReply ? null : _submitReply,
-                          style: ElevatedButton.styleFrom(minimumSize: const Size(110, 58)),
-                          child: _isSubmittingReply ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3)) : const Text('Submit'),
+                          style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(110, 58)),
+                          child: _isSubmittingReply
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 3))
+                              : const Text('Submit'),
                         ),
                       ],
                     ),
@@ -429,19 +477,42 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
               const Divider(height: 32, thickness: 1),
               ExpansionTile(
-                title: const Text('Change Ticket Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('Change Ticket Details',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 tilePadding: EdgeInsets.zero,
                 initiallyExpanded: false,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0, vertical: 8.0),
                     child: Column(
                       children: [
                         _buildStatusEditorRow(),
                         const SizedBox(height: 8),
-                        _buildDropdownRow(label: 'Category:', value: _selectedCategory, items: widget.allCategories, onChanged: (v) => setState(() { if (v != null) _selectedCategory = v; })),
-                        _buildDropdownRow(label: 'Priority:', value: _selectedPriority, items: _priorityOptions, onChanged: (v) => setState(() { if (v != null) _selectedPriority = v; }), prefixIcon: Icon(Icons.flag, color: _getPriorityColor(_selectedPriority), size: 20)),
-                        _buildDropdownRow(label: 'Assigned to:', value: _assignedTo, items: widget.allTeamMembers, onChanged: (v) => setState(() { if (v != null) _assignedTo = v; })),
+                        _buildDropdownRow(
+                            label: 'Category:',
+                            value: _selectedCategory,
+                            items: widget.allCategories,
+                            onChanged: (v) => setState(() {
+                                  if (v != null) _selectedCategory = v;
+                                })),
+                        _buildDropdownRow(
+                            label: 'Priority:',
+                            value: _selectedPriority,
+                            items: _priorityOptions,
+                            onChanged: (v) => setState(() {
+                                  if (v != null) _selectedPriority = v;
+                                }),
+                            prefixIcon: Icon(Icons.flag,
+                                color: _getPriorityColor(_selectedPriority),
+                                size: 20)),
+                        _buildDropdownRow(
+                            label: 'Assigned to:',
+                            value: _assignedTo,
+                            items: widget.allTeamMembers,
+                            onChanged: (v) => setState(() {
+                                  if (v != null) _assignedTo = v;
+                                })),
                       ],
                     ),
                   )
@@ -450,12 +521,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ] else ...[
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.green.shade200)),
+                decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200)),
                 child: Row(
                   children: [
                     Icon(Icons.check_circle, color: Colors.green.shade700),
                     const SizedBox(width: 12),
-                    Text('This ticket has been resolved.', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                    Text('This ticket has been resolved.',
+                        style: TextStyle(
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -470,11 +547,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Status: $_selectedStatus', style: TextStyle(color: _getStatusColor(_selectedStatus), fontWeight: FontWeight.bold)),
+        Text(
+          'Status: $_selectedStatus',
+          style: TextStyle(
+              color: _getStatusColor(_selectedStatus),
+              fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 4),
-        Text('Contact: ${widget.ticket.requesterName}', style: TextStyle(color: Colors.grey.shade600)),
+        Text(
+          'Contact: ${widget.ticket.requesterName}',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
         const SizedBox(height: 2),
-        Text('ID: #${widget.ticket.trackid}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        Text(
+          'ID: #${widget.ticket.trackid}',
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+        ),
       ],
     );
   }
