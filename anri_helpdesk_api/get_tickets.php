@@ -18,10 +18,7 @@ require 'auth_check.php';
 // Memanggil file koneksi
 require 'koneksi.php';
 
-// Menetapkan header agar respons berupa JSON dan bisa diakses dari mana saja
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
 header('Content-Type: application/json');
 
 // --- PENGATURAN PAGINATION ---

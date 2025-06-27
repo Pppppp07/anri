@@ -1,8 +1,14 @@
 <?php
-// Set header untuk mengizinkan akses dari mana saja (Cross-Origin Resource Sharing)
+// --- HEADER CORS UNTUK MENGIZINKAN AKSES DARI FLUTTER WEB ---
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: *");
-header("Access-Control-Allow-Methods: *");
+header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+// Menangani Pre-flight Request (penting untuk browser)
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 // Detail koneksi database Anda
 $db_host = '127.0.0.1'; // atau 'localhost'
