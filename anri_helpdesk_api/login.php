@@ -1,29 +1,21 @@
 <?php
-// --- HEADER CORS UNTUK MENGIZINKAN AKSES DARI FLUTTER WEB ---
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-// Menangani Pre-flight Request (penting untuk browser)
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require 'koneksi.php';
 
-// Menangani CORS Pre-flight request
+// --- HEADER CORS ---
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    header("Access-Control-Allow-Origin: *");
-    header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization");
-    exit(0);
+    http_response_code(200);
+    exit();
 }
+// --- AKHIR HEADER CORS ---
 
 header('Content-Type: application/json');
-header("Access-Control-Allow-Origin: *");
 
 $response = array();
 $data = json_decode(file_get_contents("php://input"));
@@ -42,40 +34,37 @@ if (isset($data->username) && isset($data->password)) {
         $row = mysqli_fetch_assoc($result);
         
         if (password_verify($password, $row['pass'])) {
-            // --- PERUBAHAN UTAMA: MENAMBAHKAN TRY-CATCH UNTUK MENANGKAP ERROR ---
             try {
-                // Jika password cocok, buat token
                 $user_id = $row['id'];
-                $selector = bin2hex(random_bytes(8));
+                
+                // --- PERBAIKAN DI SINI ---
+                // bin2hex(random_bytes(6)) akan menghasilkan string 12 karakter,
+                // sesuai dengan skema database Anda (char(12)).
+                $selector = bin2hex(random_bytes(6)); 
                 $validator = bin2hex(random_bytes(32));
+                
                 $hashed_validator = hash('sha256', $validator);
                 $expires = date('Y-m-d H:i:s', time() + (30 * 24 * 60 * 60));
 
-                // Mulai transaction untuk memastikan semua query berhasil
                 mysqli_begin_transaction($conn);
 
-                // Hapus token lama untuk user ini
                 $delete_old_sql = "DELETE FROM `hesk_auth_tokens` WHERE `user_id` = ?";
                 $stmt_delete = mysqli_prepare($conn, $delete_old_sql);
                 mysqli_stmt_bind_param($stmt_delete, "i", $user_id);
                 mysqli_stmt_execute($stmt_delete);
                 mysqli_stmt_close($stmt_delete);
 
-                // Masukkan token baru
                 $sql_token = "INSERT INTO `hesk_auth_tokens` (`selector`, `token`, `user_id`, `expires`) VALUES (?, ?, ?, ?)";
                 $stmt_token = mysqli_prepare($conn, $sql_token);
                 mysqli_stmt_bind_param($stmt_token, "ssis", $selector, $hashed_validator, $user_id, $expires);
                 
-                // Jika insert gagal, lemparkan exception
                 if (!mysqli_stmt_execute($stmt_token)) {
                     throw new Exception(mysqli_stmt_error($stmt_token));
                 }
                 mysqli_stmt_close($stmt_token);
                 
-                // Jika semua query berhasil, commit transaction
                 mysqli_commit($conn);
                 
-                // Jika berhasil sampai sini, baru siapkan respons sukses
                 $response['success'] = true;
                 $response['message'] = "Login berhasil!";
                 $response['user_data'] = array(
@@ -87,13 +76,10 @@ if (isset($data->username) && isset($data->password)) {
                 $response['token'] = $selector . ':' . $validator;
 
             } catch (Exception $e) {
-                mysqli_rollback($conn); // Batalkan semua query jika ada yg gagal
+                mysqli_rollback($conn);
                 $response['success'] = false;
-                // Pesan error sekarang akan lebih spesifik!
                 $response['message'] = "Gagal membuat sesi token: " . $e->getMessage();
             }
-            // --- AKHIR DARI PERUBAHAN ---
-
         } else {
             $response['success'] = false;
             $response['message'] = "Username atau password salah.";

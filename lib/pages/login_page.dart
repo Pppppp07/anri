@@ -75,8 +75,10 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   }
 
   // --- FUNGSI INI DIRAPIKAN UNTUK MENJADI SATU-SATUNYA SUMBER PENYIMPANAN ---
-  Future<void> _saveCredentials(
-      {required Map<String, dynamic> userData, required String token}) async {
+  Future<void> _saveCredentials({
+    required Map<String, dynamic> userData,
+    required String token,
+  }) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setInt('user_id', userData['id']);
@@ -86,10 +88,10 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     await prefs.setString('auth_token', token); // Simpan token otentikasi
     await prefs.setBool('rememberMe', _rememberMe);
   }
-  
+
   Future<void> _clearCredentials() async {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 
   void _handleLogin() async {
@@ -102,8 +104,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         _errorMessage = null;
       });
 
-      final url =
-          Uri.parse('http://127.0.0.1:8080/anri_helpdesk_api/login.php');
+      final url = Uri.parse('http://127.0.0.1/anri_helpdesk_api/login.php');
 
       try {
         final response = await http
@@ -129,24 +130,26 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             if (authToken != null) {
               // Jika login sukses dan dapat token, simpan kredensial
               if (_rememberMe) {
-                 await _saveCredentials(userData: userData, token: authToken);
+                await _saveCredentials(userData: userData, token: authToken);
               } else {
-                 await _clearCredentials();
+                await _clearCredentials();
               }
-              
+
               if (mounted) {
                 // Navigasi ke HomePage dengan membawa nama dan token
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => HomePage(
-                          currentUserName: currentUserName,
-                          authToken: authToken)),
+                    builder: (context) => HomePage(
+                      currentUserName: currentUserName,
+                      authToken: authToken,
+                    ),
+                  ),
                 );
               }
             } else {
               // Handle jika API sukses tapi tidak mengirim token
-               setState(() {
+              setState(() {
                 _errorMessage = 'Login gagal: Server tidak memberikan token.';
               });
             }
@@ -263,14 +266,16 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             controller: _usernameController,
                             keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
-                            onFieldSubmitted: (_) => FocusScope.of(context)
-                                .requestFocus(_passwordFocusNode),
+                            onFieldSubmitted: (_) => FocusScope.of(
+                              context,
+                            ).requestFocus(_passwordFocusNode),
                             decoration: const InputDecoration(
                               labelText: 'Username / NIP',
                               hintText: 'Enter your Username or NIP',
                               border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(12)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(12),
+                                ),
                               ),
                               prefixIcon: Icon(Icons.person),
                               filled: true,
@@ -294,8 +299,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               labelText: 'Password',
                               hintText: 'Enter your Password',
                               border: const OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(12)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(12),
+                                ),
                               ),
                               prefixIcon: const Icon(Icons.lock),
                               suffixIcon: IconButton(
@@ -327,8 +333,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                 children: [
                                   Checkbox(
                                     value: _rememberMe,
-                                    onChanged: (bool? newValue) => setState(
-                                        () => _rememberMe = newValue!),
+                                    onChanged: (bool? newValue) =>
+                                        setState(() => _rememberMe = newValue!),
                                     activeColor: Colors.blue.shade700,
                                   ),
                                   const Text(
@@ -371,8 +377,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 elevation: 8,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                               child: _isLoading
                                   ? const CircularProgressIndicator(
