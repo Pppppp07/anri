@@ -158,7 +158,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) { setState(() => _isLoadingDetails = false); return; }
 
-    final url = Uri.parse('http://127.0.0.1/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}');
+    final url = Uri.parse('http://192.168.1.16/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}');
     try {
       final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
       if (mounted) {
@@ -187,7 +187,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
     final finalTimeWorked = _formatDuration(_workedDuration);
-    final url = Uri.parse('http://127.0.0.1/anri_helpdesk_api/update_ticket.php');
+    final url = Uri.parse('http://192.168.1.16/anri_helpdesk_api/update_ticket.php');
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) { setState(() => _isSaving = false); return; }
 
@@ -227,7 +227,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       return;
     }
     setState(() => _isSubmittingReply = true);
-    final url = Uri.parse('http://127.0.0.1/anri_helpdesk_api/add_reply.php');
+    final url = Uri.parse('http://192.168.1.16/anri_helpdesk_api/add_reply.php');
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) { setState(() => _isSubmittingReply = false); return; }
 

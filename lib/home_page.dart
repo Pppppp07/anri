@@ -138,11 +138,7 @@ class _HomePageState extends State<HomePage> {
   ];
 
   String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost/anri_helpdesk_api';
-    } else {
-      return 'http://10.0.2.2/anri_helpdesk_api';
-    }
+    return 'http://192.168.1.16/anri_helpdesk_api';
   }
 
   @override
@@ -224,9 +220,14 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200 && mounted) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
-          final List<String> fetchedMembers = List<String>.from(
-            responseData['data'],
-          );
+          // --- PERUBAHAN DI SINI ---
+          // Kita ubah cara memproses 'data' dari API
+          final List<dynamic> data = responseData['data'];
+          final List<String> fetchedMembers = data
+              .map((user) => user['name'].toString()) // Ambil 'name' dari setiap map
+              .toList();
+          // --- AKHIR PERUBAHAN ---
+          
           setState(() {
             _teamMembers = fetchedMembers.isNotEmpty
                 ? fetchedMembers
@@ -236,6 +237,8 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint("Gagal mengambil daftar tim: $e");
+      // Anda bisa menambahkan pesan error di UI jika diperlukan
+      // setState(() => _error = 'Gagal memuat daftar tim.');
     }
   }
 
