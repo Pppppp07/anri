@@ -17,6 +17,7 @@ require 'auth_check.php';
 // Memanggil file koneksi
 require 'koneksi.php';
 
+
 header('Content-Type: application/json');
 
 // --- PENGATURAN PAGINATION ---
@@ -39,7 +40,8 @@ $sql = "SELECT
             t.id, t.trackid, t.name AS requester_name, t.subject,
             t.dt AS creation_date, t.lastchange, t.status, t.priority,
             t.lastreplier, t.message, t.replies, t.time_worked, t.due_date,
-            c.name AS category_name, o.name AS owner_name, lr.name AS last_replier_name
+            c.name AS category_name, o.name AS owner_name, lr.name AS last_replier_name,
+            t.custom1, t.custom2
         FROM `hesk_tickets` AS t
         LEFT JOIN `hesk_categories` AS c ON t.category = c.id
         LEFT JOIN `hesk_users` AS o ON t.owner = o.id
@@ -126,6 +128,8 @@ $response = [];
 $tickets = [];
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
+        $row['subject'] = html_entity_decode($row['subject'] ?? '', ENT_QUOTES, 'UTF-8');
+        $row['requester_name'] = html_entity_decode($row['requester_name'] ?? '', ENT_QUOTES, 'UTF-8');
         $row['status_text'] = array_search((int)$row['status'], $status_map, true) ?: 'Unknown';
         $row['priority_text'] = match ((int)$row['priority']) {
             0 => 'Critical', 1 => 'High', 2 => 'Medium', 3 => 'Low', default => 'Unknown',

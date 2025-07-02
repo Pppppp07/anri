@@ -136,8 +136,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileHeader() {
+    // Menghitung tinggi status bar dan AppBar secara dinamis
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+    final double appBarHeight = kToolbarHeight; // Tinggi AppBar standar Flutter
+
     return Container(
-      padding: const EdgeInsets.only(top: 40, bottom: 20),
+      // Padding atas disesuaikan agar konten tidak tertimpa status bar dan AppBar transparan
+      padding: EdgeInsets.only(top: statusBarHeight + appBarHeight, bottom: 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.blue.shade400, Colors.blue.shade700],

@@ -270,8 +270,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               context,
                             ).requestFocus(_passwordFocusNode),
                             decoration: const InputDecoration(
-                              labelText: 'Username / NIP',
-                              hintText: 'Enter your Username or NIP',
+                              labelText: 'Username',
+                              hintText: 'Enter your Username',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.all(
                                   Radius.circular(12),
@@ -283,7 +283,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Username or NIP cannot be empty';
+                                return 'Username or cannot be empty';
                               }
                               return null;
                             },
@@ -342,13 +342,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                     style: TextStyle(color: Colors.blueGrey),
                                   ),
                                 ],
-                              ),
-                              TextButton(
-                                onPressed: () {},
-                                child: const Text(
-                                  'Forgot Password?',
-                                  style: TextStyle(color: Colors.blue),
-                                ),
                               ),
                             ],
                           ),

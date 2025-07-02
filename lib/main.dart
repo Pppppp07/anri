@@ -13,7 +13,6 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-// Widget utama aplikasi (tidak ada perubahan di sini)
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
