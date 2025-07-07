@@ -166,7 +166,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       return;
     }
     final url = Uri.parse(
-      '${ApiConfig.baseUrl}/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}',
+      '${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}',
     );
 
     try {
@@ -225,7 +225,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     };
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.1.2/anri_helpdesk_api/update_ticket.php'),
+        Uri.parse('http://192.168.1.2/update_ticket.php'),
         headers: headers,
         body: body,
       );
@@ -275,7 +275,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
     try {
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/anri_helpdesk_api/add_reply.php'),
+        Uri.parse('${ApiConfig.baseUrl}/add_reply.php'),
         headers: headers,
         body: {
           'ticket_id': widget.ticket.id.toString(),

@@ -149,7 +149,7 @@ class _HomePageState extends State<HomePage> {
 
   String get baseUrl {
 
-    return '${ApiConfig.baseUrl}/anri_helpdesk_api';
+    return '${ApiConfig.baseUrl}';
   }
 
   @override

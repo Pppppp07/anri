@@ -106,7 +106,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       });
 
 
-      final url = Uri.parse('${ApiConfig.baseUrl}/anri_helpdesk_api/login.php');
+      final url = Uri.parse('${ApiConfig.baseUrl}/login.php');
 
 
       try {

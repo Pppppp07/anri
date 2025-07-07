@@ -39,6 +39,7 @@ dependencies:
   http: ^1.2.1 
   timeago: ^3.6.1
   flutter_html: ^3.0.0 
+  flutter_dotenv: ^5.1.0 
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +68,7 @@ flutter:
     - assets/images/label-high.png
     - assets/images/label-medium.png
     - assets/images/label-low.png
+    - .env
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

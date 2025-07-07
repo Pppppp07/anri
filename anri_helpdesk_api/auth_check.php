@@ -1,59 +1,64 @@
 <?php
-// --- HEADER CORS UNTUK MENGIZINKAN AKSES DARI FLUTTER WEB ---
+// Mulai output buffering untuk file ini juga.
+ob_start();
+
+// Hapus atau comment baris error reporting
+/*
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+*/
+
+// --- HEADER CORS ---
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-// Menangani Pre-flight Request (penting untuk browser)
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
+    ob_end_clean();
     exit();
 }
+// --- AKHIR HEADER CORS ---
 
-// --- FUNGSI INI DISEMPURNAKAN AGAR LEBIH TANGGUH ---
 function get_bearer_token() {
     $authHeader = null;
     $headers = getallheaders();
 
-    // Coba ambil header dari berbagai kemungkinan sumber
     if (isset($headers['Authorization'])) {
         $authHeader = $headers['Authorization'];
     } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-        // Fallback untuk beberapa konfigurasi server Apache
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
     } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-        // Fallback lain yang terkadang diperlukan setelah RewriteRule .htaccess
         $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
     }
 
     if ($authHeader !== null) {
-        // Jika header ditemukan, ekstrak token dari format "Bearer <token>"
         if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
             return $matches[1];
         }
     }
-
-    // Jika tidak ada header atau token tidak ditemukan, kembalikan null
     return null;
 }
-// --- AKHIR DARI PENYEMPURNAAN FUNGSI ---
 
 $token_from_user = get_bearer_token();
 
 if (!$token_from_user) {
+    ob_clean(); // Bersihkan buffer sebelum mengirim error
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Akses ditolak: Token tidak ditemukan.']);
     exit();
 }
 
-// Logika Anda selanjutnya tidak berubah
-list($selector, $token) = explode(':', $token_from_user);
-
-if (!$selector || !$token) {
+// Pisahkan token
+$token_parts = explode(':', $token_from_user);
+if (count($token_parts) !== 2) {
+    ob_clean();
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Akses ditolak: Format token tidak valid.']);
     exit();
 }
+list($selector, $token) = $token_parts;
+
 
 require 'koneksi.php';
 
@@ -64,28 +69,24 @@ mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 
 if ($auth_token_row = mysqli_fetch_assoc($result)) {
-    // Token ditemukan dan belum kedaluwarsa, verifikasi isinya
     $hashed_token_from_db = $auth_token_row['token'];
     $hashed_token_from_user = hash('sha256', $token);
 
     if (!hash_equals($hashed_token_from_db, $hashed_token_from_user)) {
-        // Token tidak cocok, upaya peretasan?
+        ob_clean();
         http_response_code(401);
         echo json_encode(['success' => false, 'message' => 'Akses ditolak: Token tidak cocok.']);
         exit();
     }
-    
-    // Sukses! Token valid.
-    // Anda bisa mengambil data user di sini jika perlu
-    // $user_id = $auth_token_row['user_id'];
+    // Jika sukses, jangan kirim output apa pun. Biarkan skrip pemanggil yang melanjutkan.
 
 } else {
-    // Token tidak ditemukan atau sudah kedaluwarsa
+    ob_clean();
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Akses ditolak: Token tidak valid atau kedaluwarsa.']);
     exit();
 }
 
-// Jangan tutup koneksi di sini, karena akan digunakan oleh skrip pemanggil
+// Jangan tutup koneksi, jangan bersihkan buffer jika valid, agar skrip pemanggil bisa lanjut.
 // mysqli_close($conn);
 ?>

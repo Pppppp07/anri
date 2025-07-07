@@ -1,4 +1,11 @@
-//Ganti IP sesuai dengan alamat server backend yang digunakan
+// lib/config/api_config.dart
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ApiConfig {
-  static const String baseUrl = 'http://10.8.0.157';
+  // Ganti konstanta statis dengan getter statis
+  static String get baseUrl {
+    // Ambil nilai dari environment variable 'API_BASE_URL'
+    // Tambahkan fallback untuk keamanan jika variabel tidak ditemukan
+    return dotenv.env['API_BASE_URL'] ?? 'http://default.url.com';
+  }
 }
