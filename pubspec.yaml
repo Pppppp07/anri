@@ -32,18 +32,13 @@ dependencies:
     sdk: flutter
 
   # Pastikan Anda menggunakan nama yang ini:
-  shared_preferences: ^2.2.3 
-  
+  shared_preferences: ^2.2.3
   particles_flutter: ^0.1.4
-
   cupertino_icons: ^1.0.8
-
   intl: ^0.19.0 # Tambahkan ini untuk format tanggal
-
   http: ^1.2.1 
-
   timeago: ^3.6.1
-  flutter_html: ^3.0.0
+  flutter_html: ^3.0.0 
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +63,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/anri_logo.png
+    - assets/images/label-critical.png
+    - assets/images/label-high.png
+    - assets/images/label-medium.png
+    - assets/images/label-low.png
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

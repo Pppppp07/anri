@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/config/api_config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -104,7 +105,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         _errorMessage = null;
       });
 
-      final url = Uri.parse('http://192.168.1.16/anri_helpdesk_api/login.php');
+  fix/perbaikan-final
+      final url = Uri.parse('${ApiConfig.baseUrl}/anri_helpdesk_api/login.php');
+
 
       try {
         final response = await http
@@ -270,8 +273,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               context,
                             ).requestFocus(_passwordFocusNode),
                             decoration: const InputDecoration(
-                              labelText: 'Username / NIP',
-                              hintText: 'Enter your Username or NIP',
+                              labelText: 'Username',
+                              hintText: 'Enter your Username',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.all(
                                   Radius.circular(12),
@@ -283,7 +286,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Username or NIP cannot be empty';
+                                return 'Username or cannot be empty';
                               }
                               return null;
                             },
@@ -342,13 +345,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                     style: TextStyle(color: Colors.blueGrey),
                                   ),
                                 ],
-                              ),
-                              TextButton(
-                                onPressed: () {},
-                                child: const Text(
-                                  'Forgot Password?',
-                                  style: TextStyle(color: Colors.blue),
-                                ),
                               ),
                             ],
                           ),

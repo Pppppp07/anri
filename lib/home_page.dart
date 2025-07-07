@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/config/api_config.dart';
 
-// Model data Ticket tidak berubah
 class Ticket {
   final int id;
   final String trackid;
@@ -26,6 +26,8 @@ class Ticket {
   final int replies;
   final String timeWorked;
   final DateTime? dueDate;
+  final String custom1; // Untuk Unit Kerja
+  final String custom2; // Untuk No Ext/Hp
 
   Ticket({
     required this.id,
@@ -43,6 +45,8 @@ class Ticket {
     required this.replies,
     required this.timeWorked,
     this.dueDate,
+    required this.custom1,
+    required this.custom2,
   });
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -64,6 +68,8 @@ class Ticket {
       dueDate: json['due_date'] != null
           ? DateTime.parse(json['due_date'])
           : null,
+      custom1: json['custom1'] ?? '-',
+      custom2: json['custom2'] ?? '-',
     );
   }
 }
@@ -82,24 +88,28 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+enum ListState { loading, error, empty, hasData }
+
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   String _selectedCategory = 'All';
   String _selectedStatus = 'New';
-  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-
+  final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounce;
+  Timer? _autoRefreshTimer;
 
-  List<Ticket> _tickets = [];
+  final ValueNotifier<List<Ticket>> _ticketsNotifier = ValueNotifier([]);
+  final ValueNotifier<ListState> _listStateNotifier = ValueNotifier(
+    ListState.loading,
+  );
+  final ValueNotifier<bool> _isLoadingMoreNotifier = ValueNotifier(false);
+
   int _currentPage = 1;
-  bool _isLoading = true;
-  bool _isLoadingMore = false;
   bool _hasMore = true;
-  String? _error;
+  String _searchQuery = '';
 
   final ScrollController _scrollController = ScrollController();
-  Timer? _autoRefreshTimer;
   final GlobalKey _headerFilterKey = GlobalKey();
   bool _isFabVisible = false;
   List<String> _teamMembers = ['Unassigned'];
@@ -138,7 +148,8 @@ class _HomePageState extends State<HomePage> {
   ];
 
   String get baseUrl {
-    return 'http://192.168.1.16/anri_helpdesk_api';
+ fix/perbaikan-final
+    return '${ApiConfig.baseUrl}/anri_helpdesk_api';
   }
 
   @override
@@ -156,14 +167,30 @@ class _HomePageState extends State<HomePage> {
       });
     });
 
+    _searchController.addListener(() {
+      if ((_searchController.text.isEmpty && _searchQuery.isNotEmpty) ||
+          (_searchController.text.isNotEmpty && _searchQuery.isEmpty)) {
+        setState(() {});
+      }
+
+      _searchQuery = _searchController.text;
+
+      if (_debounce?.isActive ?? false) _debounce!.cancel();
+      _debounce = Timer(const Duration(milliseconds: 500), () {
+        _fetchInitialTickets();
+      });
+    });
+
     _scrollController.addListener(() {
-      final headerContext = _headerFilterKey.currentContext;
-      if (headerContext != null) {
-        final headerHeight = headerContext.size?.height ?? 200.0;
-        if (_scrollController.offset > headerHeight) {
-          if (!_isFabVisible) setState(() => _isFabVisible = true);
-        } else {
-          if (_isFabVisible) setState(() => _isFabVisible = false);
+      if (_scrollController.hasClients) {
+        final headerContext = _headerFilterKey.currentContext;
+        if (headerContext != null) {
+          final headerHeight = headerContext.size?.height ?? 200.0;
+          if (_scrollController.offset > headerHeight) {
+            if (!_isFabVisible) setState(() => _isFabVisible = true);
+          } else {
+            if (_isFabVisible) setState(() => _isFabVisible = false);
+          }
         }
       }
     });
@@ -171,17 +198,26 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchInitialData() async {
-    setState(() => _isLoading = true);
-    await Future.wait([_fetchTeamMembers(), _fetchTickets(page: 1)]);
-    if (mounted) setState(() => _isLoading = false);
+    // Panggil satu per satu. Jika _fetchTeamMembers gagal karena auth,
+    // _fetchTickets tidak akan pernah dipanggil.
+    await _fetchTeamMembers();
+
+    // Pastikan widget masih ada di tree sebelum melanjutkan
+    if (!mounted) return;
+
+    await _fetchTickets(page: 1);
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _autoRefreshTimer?.cancel();
     _debounce?.cancel();
+    _ticketsNotifier.dispose();
+    _listStateNotifier.dispose();
+    _isLoadingMoreNotifier.dispose();
     super.dispose();
   }
 
@@ -198,9 +234,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startAutoRefreshTimer() {
+    _autoRefreshTimer?.cancel();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      if (_selectedIndex != 2 && mounted && !_isLoading && !_isLoadingMore) {
-        _fetchInitialTickets();
+      if (_currentPage == 1 &&
+          _selectedIndex != 2 &&
+          _searchController.text.isEmpty &&
+          mounted &&
+          _listStateNotifier.value != ListState.loading &&
+          !_isLoadingMoreNotifier.value) {
+        _silentRefreshTickets();
       }
     });
   }
@@ -220,14 +262,12 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200 && mounted) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
-          // --- PERUBAHAN DI SINI ---
-          // Kita ubah cara memproses 'data' dari API
+fix/perbaikan-final
           final List<dynamic> data = responseData['data'];
           final List<String> fetchedMembers = data
-              .map((user) => user['name'].toString()) // Ambil 'name' dari setiap map
+              .map((user) => user['name'].toString())
               .toList();
-          // --- AKHIR PERUBAHAN ---
-          
+
           setState(() {
             _teamMembers = fetchedMembers.isNotEmpty
                 ? fetchedMembers
@@ -243,83 +283,70 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _triggerSearch() {
-    if (_searchQuery != _searchController.text) {
-      setState(() {
-        _searchQuery = _searchController.text;
-      });
-    }
     _fetchInitialTickets();
   }
 
   Future<void> _fetchInitialTickets() async {
-    if (_tickets.isEmpty) {
-      setState(() => _isLoading = true);
-    }
-    setState(() {
-      _currentPage = 1;
-      _hasMore = true;
-      _error = null;
-    });
+    _listStateNotifier.value = ListState.loading;
+    _currentPage = 1;
+    _hasMore = true;
     await _fetchTickets(page: 1);
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _loadMoreTickets() async {
-    if (_isLoadingMore || !_hasMore) return;
-    setState(() => _isLoadingMore = true);
+    if (_isLoadingMoreNotifier.value || !_hasMore) return;
+    _isLoadingMoreNotifier.value = true;
     _currentPage++;
     await _fetchTickets(page: _currentPage);
-    if (mounted) {
-      setState(() => _isLoadingMore = false);
-    }
+    _isLoadingMoreNotifier.value = false;
   }
 
   Future<void> _fetchTickets({required int page}) async {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) return;
+
     String statusForAPI = _selectedStatus;
     if (_selectedIndex == 1) {
       statusForAPI = 'Resolved';
     } else if (_selectedStatus == 'Semua Status') {
       statusForAPI = 'All';
     }
+
     final url = Uri.parse(
-      '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=$page&search=$_searchQuery',
+      '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=$page&search=${_searchController.text}',
     );
+
     try {
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 20));
-      if (response.statusCode == 401) {
-        if (mounted) {
-          _logout(
-            context,
-            message: 'Sesi Anda tidak valid. Silakan login kembali.',
-          );
-        }
+
+      if (response.statusCode == 401 && mounted) {
+        _logout(context, message: 'Sesi tidak valid. Silakan login kembali.');
         return;
       }
       if (response.statusCode == 200 && mounted) {
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          final List<dynamic> ticketData = responseData['data'];
-          final List<Ticket> newTickets = ticketData
-              .map((json) => Ticket.fromJson(json as Map<String, dynamic>))
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final newTickets = (data['data'] as List)
+              .map((json) => Ticket.fromJson(json))
               .toList();
-          setState(() {
-            if (page == 1) {
-              _tickets = newTickets;
-            } else {
-              _tickets.addAll(newTickets);
-            }
-            if (newTickets.length < 10) {
-              _hasMore = false;
-            }
-          });
+
+          if (page == 1) {
+            _ticketsNotifier.value = newTickets;
+          } else {
+            _ticketsNotifier.value = [..._ticketsNotifier.value, ...newTickets];
+          }
+
+          _hasMore = newTickets.length >= 10;
+
+          if (_ticketsNotifier.value.isEmpty) {
+            _listStateNotifier.value = ListState.empty;
+          } else {
+            _listStateNotifier.value = ListState.hasData;
+          }
         } else {
-          throw Exception(responseData['message'] ?? 'Gagal mengambil data');
+          throw Exception(data['message'] ?? 'Gagal memuat data');
         }
       } else {
         throw Exception(
@@ -327,9 +354,7 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _error = 'Tidak dapat terhubung. Periksa koneksi Anda.');
-      }
+      _listStateNotifier.value = ListState.error;
     }
   }
 
@@ -354,6 +379,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Color _getStatusColor(String status) {
+    if (status == 'Semua Status') {
+      return Colors.black87;
+    }
     switch (status) {
       case 'New':
         return const Color(0xFFD32F2F);
@@ -372,28 +400,57 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  String _getPriorityIconPath(String priority) {
+    switch (priority) {
+      case 'Critical':
+        return 'assets/images/label-critical.png';
+      case 'High':
+        return 'assets/images/label-high.png';
+      case 'Medium':
+        return 'assets/images/label-medium.png';
+      case 'Low':
+        return 'assets/images/label-low.png';
+      default:
+        return 'assets/images/label-medium.png';
+    }
+  }
+
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'Critical':
-        return const Color(0xFFD32F2F);
+        return Colors.red.shade700;
       case 'High':
-        return const Color(0xFFEF6C00);
+        return Colors.orange.shade800;
       case 'Medium':
-        return const Color(0xFF689F38);
+        return Colors.green.shade700;
       case 'Low':
-        return const Color(0xFF0288D1);
+        return Colors.blue.shade700;
       default:
-        return Colors.grey;
+        return Colors.grey.shade700;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const pageBackgroundDecoration = BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          Colors.white,
+          Color(0xFFE0F2F7),
+          Color(0xFFBBDEFB),
+          Colors.blueAccent,
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        stops: [0.0, 0.4, 0.7, 1.0],
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: _buildAppBarTitle(),
-        backgroundColor: Colors.white,
-        elevation: 1,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: _selectedIndex == 0
             ? [
                 Center(
@@ -401,14 +458,26 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.only(right: 16.0),
                     child: Text(
                       'Hi, ${widget.currentUserName}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ),
               ]
             : null,
       ),
-      body: _buildBody(),
+      body: Stack(
+        children: [
+          Container(
+            decoration: _selectedIndex != 2 ? pageBackgroundDecoration : null,
+            color: _selectedIndex == 2 ? Colors.grey[100] : null,
+          ),
+          _buildBody(),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       floatingActionButton: _selectedIndex != 2 && _isFabVisible
           ? FloatingActionButton(
               onPressed: _showFilterDialog,
@@ -420,21 +489,20 @@ class _HomePageState extends State<HomePage> {
         currentIndex: _selectedIndex,
         onTap: (index) {
           if (_selectedIndex != index) {
-            // Reset search dan filter saat pindah tab
             _searchController.clear();
             _searchQuery = '';
             _selectedCategory = 'All';
             _selectedStatus = 'New';
-
             setState(() => _selectedIndex = index);
-
-            _fetchInitialTickets();
+            if (index != 2) {
+              _fetchInitialTickets();
+            }
           }
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
             label: 'Beranda',
           ),
           BottomNavigationBarItem(
@@ -455,17 +523,35 @@ class _HomePageState extends State<HomePage> {
   Widget _buildAppBarTitle() {
     switch (_selectedIndex) {
       case 0:
+      case 1:
         return Row(
           children: [
-            Image.asset('assets/images/anri_logo.png', height: 36),
+            Image.asset(
+              'assets/images/anri_logo.png',
+              height: 36,
+              filterQuality: FilterQuality.high,
+            ),
             const SizedBox(width: 12),
-            const Text('Help Desk'),
+            ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [
+                  Color(0xFF0D47A1), // Biru tua
+                  Color(0xFF1976D2), // Biru
+                  Color(0xFF42A5F5), // Biru muda
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+              child: const Text(
+                'Help Desk',
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         );
-      case 1:
-        return const Text('Riwayat Tiket Selesai');
       case 2:
-        return const Text('Profil');
+        return const SizedBox.shrink();
       default:
         return const Text('Help Desk');
     }
@@ -475,26 +561,46 @@ class _HomePageState extends State<HomePage> {
     switch (_selectedIndex) {
       case 0:
       case 1:
-        if (_isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (_error != null) {
-          return _buildErrorState(_error!);
-        }
-        return _buildTicketList();
+        return Padding(
+          padding: EdgeInsets.only(
+            top: kToolbarHeight + MediaQuery.of(context).padding.top,
+          ),
+          child: Column(
+            children: [
+              _buildHeaderFilterBar(),
+              Expanded(
+                child: ValueListenableBuilder<ListState>(
+                  valueListenable: _listStateNotifier,
+                  builder: (context, state, child) {
+                    switch (state) {
+                      case ListState.loading:
+                        return const Center(child: CircularProgressIndicator());
+                      case ListState.error:
+                        return _buildErrorState(
+                          'Tidak dapat terhubung. Periksa koneksi Anda.',
+                        );
+                      case ListState.empty:
+                        return _buildEmptyState();
+                      case ListState.hasData:
+                        return _buildTicketList();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
       case 2:
         return const ProfilePage();
       default:
-        return _buildTicketList();
+        return const SizedBox.shrink();
     }
   }
 
-  // --- FUNGSI INI DIUBAH ---
   Widget _buildHeaderFilterBar() {
     return Container(
       key: _headerFilterKey,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -503,6 +609,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: TextField(
                   controller: _searchController,
+                  focusNode: _searchFocusNode,
                   decoration: InputDecoration(
                     hintText: 'Cari tiket...',
                     prefixIcon: const Icon(Icons.search),
@@ -518,7 +625,7 @@ class _HomePageState extends State<HomePage> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Colors.grey.shade200,
+                    fillColor: Colors.white.withOpacity(0.8),
                     filled: true,
                     contentPadding: const EdgeInsets.only(left: 15),
                   ),
@@ -537,15 +644,12 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
-          // -- PERUBAHAN DI SINI --
-          // Tampilkan filter status hanya jika di halaman Beranda (_selectedIndex == 0)
           if (_selectedIndex == 0) ...[
             const SizedBox(height: 16),
             Text(
               'Status',
               style: TextStyle(
-                color: Colors.grey.shade600,
+                color: Colors.grey.shade700,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -569,6 +673,7 @@ class _HomePageState extends State<HomePage> {
                       selectedColor: Theme.of(
                         context,
                       ).primaryColor.withOpacity(0.15),
+                      backgroundColor: Colors.white.withOpacity(0.7),
                       labelStyle: TextStyle(
                         color: isSelected
                             ? Theme.of(context).primaryColor
@@ -601,100 +706,111 @@ class _HomePageState extends State<HomePage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
+            final buttonShape = RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.0),
+            );
+
             return AlertDialog(
               title: const Text('Filter Lanjutan'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Sembunyikan filter status di dialog jika di halaman Riwayat
-                    if (_selectedIndex == 0) ...[
-                      Text(
-                        'Status',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: tempStatus,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _statusDialogFilters.map((status) {
-                          return DropdownMenuItem<String>(
-                            value: status,
-                            child: Text(status),
-                          );
-                        }).toList(),
-                        onChanged: (newValue) {
-                          if (newValue != null) {
-                            setDialogState(() => tempStatus = newValue);
-                          }
-                        },
-                      ),
-                      const Divider(height: 24),
-                    ],
-                    Text(
-                      'Kategori',
-                      style: Theme.of(context).textTheme.titleSmall,
+              contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Status', style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    value: tempStatus,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
                     ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: tempCategory,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _categories.entries.map((entry) {
-                        return DropdownMenuItem<String>(
-                          value: entry.key,
-                          child: Text(
-                            entry.value,
-                            overflow: TextOverflow.ellipsis,
+                    items: _statusDialogFilters.map((status) {
+                      return DropdownMenuItem<String>(
+                        value: status,
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: _getStatusColor(status),
+                            fontWeight: status == 'Semua Status'
+                                ? FontWeight.normal
+                                : FontWeight.bold,
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setDialogState(() => tempCategory = newValue);
-                        }
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        setDialogState(() => tempStatus = newValue);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Kategori',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    value: tempCategory,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    items: _categories.entries.map((entry) {
+                      return DropdownMenuItem<String>(
+                        value: entry.key,
+                        child: Text(
+                          entry.value,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        setDialogState(() => tempCategory = newValue);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              // ================= PERUBAHAN DI SINI =================
+              actions: [
+                // Menggunakan Column untuk layout vertikal yang responsif
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    // Tombol Terapkan
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _selectedCategory = tempCategory;
+                          _selectedStatus = tempStatus;
+                        });
+                        _triggerSearch();
                       },
+                      style: FilledButton.styleFrom(shape: buttonShape),
+                      child: const Text('Terapkan'),
+                    ),
+                    const SizedBox(height: 8), // Jarak antar tombol
+                    // Tombol Atur Ulang
+                    OutlinedButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          tempStatus = 'New';
+                          tempCategory = 'All';
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(shape: buttonShape),
+                      child: const Text('Atur Ulang'),
                     ),
                   ],
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Tutup dialog dulu
-                    setState(() {
-                      _selectedStatus = 'New';
-                      _selectedCategory = 'All';
-                      _searchController.clear();
-                    });
-                  },
-                  child: const Text('Reset'),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
-                    'Batal',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Tutup dialog dulu
-                    setState(() {
-                      _selectedCategory = tempCategory;
-                      _selectedStatus = tempStatus;
-                    });
-                    _triggerSearch();
-                  },
-                  child: const Text('Terapkan'),
-                ),
               ],
+              // ================= AKHIR PERUBAHAN =================
             );
           },
         );
@@ -705,26 +821,22 @@ class _HomePageState extends State<HomePage> {
   Widget _buildTicketList() {
     return RefreshIndicator(
       onRefresh: _fetchInitialTickets,
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeaderFilterBar()),
-          if (_tickets.isEmpty && !_isLoading)
-            SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 80),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  if (index < _tickets.length) {
-                    return _buildTicketCard(_tickets[index]);
-                  } else {
-                    return _buildPaginationControl();
-                  }
-                }, childCount: _tickets.length + 1),
-              ),
-            ),
-        ],
+      child: ValueListenableBuilder<List<Ticket>>(
+        valueListenable: _ticketsNotifier,
+        builder: (context, tickets, child) {
+          return ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 80),
+            itemCount: tickets.length + 1,
+            itemBuilder: (context, index) {
+              if (index < tickets.length) {
+                return _buildTicketCard(tickets[index]);
+              } else {
+                return _buildPaginationControl();
+              }
+            },
+          );
+        },
       ),
     );
   }
@@ -733,12 +845,10 @@ class _HomePageState extends State<HomePage> {
     final DateFormat formatter = DateFormat('d MMM yy, HH:mm', 'id_ID');
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.05),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () async {
           final categoryNames = _categories.entries
@@ -760,13 +870,13 @@ class _HomePageState extends State<HomePage> {
             _fetchInitialTickets();
           }
         },
-        borderRadius: BorderRadius.circular(11),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     '#${ticket.trackid}',
@@ -776,30 +886,58 @@ class _HomePageState extends State<HomePage> {
                       fontSize: 16,
                     ),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(ticket.statusText),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      ticket.statusText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(ticket.statusText),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          ticket.statusText.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.flag,
-                    color: _getPriorityColor(ticket.priorityText),
-                    size: 20,
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getPriorityColor(
+                            ticket.priorityText,
+                          ).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            Image.asset(
+                              _getPriorityIconPath(ticket.priorityText),
+                              height: 12,
+                              width: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              ticket.priorityText,
+                              style: TextStyle(
+                                color: _getPriorityColor(ticket.priorityText),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -811,24 +949,107 @@ class _HomePageState extends State<HomePage> {
                   fontSize: 18,
                   color: Colors.black87,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Kategori: ${ticket.categoryName}',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
+              const SizedBox(height: 10),
+
+              // Baris untuk Requester/Nama
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      ticket.requesterName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color.fromARGB(255, 0, 0, 0),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Baris untuk Kategori (dengan Ikon baru)
+              Row(
+                children: [
+                  Icon(
+                    Icons.category_outlined, // Ikon baru untuk Kategori
+                    size: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      ticket.categoryName, // Menampilkan nama kategori saja
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color.fromARGB(255, 0, 0, 0),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Baris untuk Unit Kerja (kembali menggunakan Ikon)
+              Row(
+                children: [
+                  Icon(
+                    Icons.business, // Ikon gedung untuk Unit Kerja
+                    size: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      ticket.custom1, // Data Unit Kerja
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color.fromARGB(255, 0, 0, 0),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  title: const Text(
+                    'Lihat Detail Lainnya...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
+                  children: [
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    _buildDetailRow('Ditugaskan ke', ticket.ownerName),
+                    const SizedBox(height: 6),
+                    _buildDetailRow('Balasan Terakhir', ticket.lastReplierText),
+                    const SizedBox(height: 6),
+                    _buildDetailRow(
+                      'Update Terakhir',
+                      formatter.format(ticket.lastChange),
+                    ),
+                  ],
                 ),
               ),
-              const Divider(height: 24),
-              _buildDetailRow('Requester', ticket.requesterName),
-              const SizedBox(height: 6),
-              _buildDetailRow('Assigned to', ticket.ownerName),
-              const SizedBox(height: 6),
-              _buildDetailRow('Last Replied', ticket.lastReplierText),
-              const SizedBox(height: 6),
-              _buildDetailRow('Update', formatter.format(ticket.lastChange)),
             ],
           ),
         ),
@@ -838,20 +1059,23 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildDetailRow(String label, String value) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 90,
+          width: 112,
           child: Text(
             '$label:',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
           ),
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
       ],
@@ -859,36 +1083,39 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildPaginationControl() {
-    if (_isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16.0),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (_hasMore) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        child: Center(
-          child: OutlinedButton(
-            onPressed: _loadMoreTickets,
-            child: const Text('Tampilkan Lebih Banyak'),
-          ),
-        ),
-      );
-    }
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 24.0),
-      child: Center(
-        child: Text(
-          '-- Akhir dari daftar --',
-          style: TextStyle(color: Colors.grey),
-        ),
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _isLoadingMoreNotifier,
+      builder: (context, isLoadingMore, child) {
+        if (isLoadingMore) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (_hasMore) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(
+              child: FilledButton.icon(
+                onPressed: _loadMoreTickets,
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Tampilkan Lebih Banyak'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).primaryColor,
+                  elevation: 2,
+                ),
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 
   Widget _buildEmptyState() {
-    bool isSearching = _searchQuery.isNotEmpty;
+    bool isSearching = _searchController.text.isNotEmpty;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -931,6 +1158,11 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _silentRefreshTickets() async {
+    if (_isLoadingMoreNotifier.value) return;
+    await _fetchTickets(page: 1);
   }
 
   Widget _buildErrorState(String error) {

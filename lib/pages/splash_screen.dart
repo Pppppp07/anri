@@ -121,16 +121,18 @@ class _SplashScreenState extends State<SplashScreen>
                     shaderCallback: (bounds) {
                       final double value = _controller.value;
                       final Alignment begin = Alignment(
-                          math.sin(value * 2 * math.pi * 2.0),
-                          math.cos(value * 2 * math.pi * 1.5));
+                        math.sin(value * 2 * math.pi * 2.0),
+                        math.cos(value * 2 * math.pi * 1.5),
+                      );
                       final Alignment end = Alignment(
-                          math.cos(value * 2 * math.pi * 1.2),
-                          math.sin(value * 2 * math.pi * 2.5));
+                        math.cos(value * 2 * math.pi * 1.2),
+                        math.sin(value * 2 * math.pi * 2.5),
+                      );
                       return LinearGradient(
                         colors: [
                           Colors.blue.shade300,
                           Colors.blue.shade700,
-                          Colors.lightBlueAccent
+                          Colors.lightBlueAccent,
                         ],
                         begin: begin,
                         end: end,
@@ -139,10 +141,11 @@ class _SplashScreenState extends State<SplashScreen>
                     child: const Text(
                       'Helpdesk',
                       style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 2),
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
                 ],
