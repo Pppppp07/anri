@@ -148,6 +148,7 @@ class _HomePageState extends State<HomePage> {
   ];
 
   String get baseUrl {
+ fix/perbaikan-final
     return '${ApiConfig.baseUrl}/anri_helpdesk_api';
   }
 
@@ -261,10 +262,12 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200 && mounted) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
+fix/perbaikan-final
           final List<dynamic> data = responseData['data'];
           final List<String> fetchedMembers = data
               .map((user) => user['name'].toString())
               .toList();
+
           setState(() {
             _teamMembers = fetchedMembers.isNotEmpty
                 ? fetchedMembers
@@ -274,6 +277,8 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint("Gagal mengambil daftar tim: $e");
+      // Anda bisa menambahkan pesan error di UI jika diperlukan
+      // setState(() => _error = 'Gagal memuat daftar tim.');
     }
   }
 

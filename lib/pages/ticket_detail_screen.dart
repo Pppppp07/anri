@@ -160,6 +160,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   Future<void> _fetchTicketDetails() async {
     setState(() => _isLoadingDetails = true);
     final headers = await _getAuthHeaders();
+fix/perbaikan-final
     if (headers.isEmpty) {
       setState(() => _isLoadingDetails = false);
       return;
@@ -167,6 +168,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     final url = Uri.parse(
       '${ApiConfig.baseUrl}/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}',
     );
+
     try {
       final response = await http
           .get(url, headers: headers)
@@ -203,6 +205,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
+fix/perbaikan-final
+
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) {
       setState(() => _isSaving = false);
@@ -261,6 +265,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       return;
     }
     setState(() => _isSubmittingReply = true);
+ fix/perbaikan-final
+
+
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) {
       setState(() => _isSubmittingReply = false);
