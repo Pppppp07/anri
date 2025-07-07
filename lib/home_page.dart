@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/config/api_config.dart';
 
-// Model data Ticket (sudah menyertakan custom1 dan custom2)
 class Ticket {
   final int id;
   final String trackid;
@@ -148,17 +148,23 @@ class _HomePageState extends State<HomePage> {
   ];
 
   String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost/anri_helpdesk_api';
-    } else {
-      return 'http://10.0.2.2/anri_helpdesk_api';
-    }
+    return '${ApiConfig.baseUrl}/anri_helpdesk_api';
   }
 
   @override
   void initState() {
     super.initState();
     _fetchInitialData();
+
+    _searchController.addListener(() {
+      setState(() {});
+      if (_debounce?.isActive ?? false) _debounce!.cancel();
+      _debounce = Timer(const Duration(milliseconds: 500), () {
+        if (_searchQuery != _searchController.text) {
+          _triggerSearch();
+        }
+      });
+    });
 
     _searchController.addListener(() {
       if ((_searchController.text.isEmpty && _searchQuery.isNotEmpty) ||
@@ -191,7 +197,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchInitialData() async {
-    await Future.wait([_fetchTeamMembers(), _fetchTickets(page: 1)]);
+    // Panggil satu per satu. Jika _fetchTeamMembers gagal karena auth,
+    // _fetchTickets tidak akan pernah dipanggil.
+    await _fetchTeamMembers();
+
+    // Pastikan widget masih ada di tree sebelum melanjutkan
+    if (!mounted) return;
+
+    await _fetchTickets(page: 1);
   }
 
   @override
@@ -248,9 +261,10 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200 && mounted) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
-          final List<String> fetchedMembers = List<String>.from(
-            responseData['data'],
-          );
+          final List<dynamic> data = responseData['data'];
+          final List<String> fetchedMembers = data
+              .map((user) => user['name'].toString())
+              .toList();
           setState(() {
             _teamMembers = fetchedMembers.isNotEmpty
                 ? fetchedMembers
@@ -934,33 +948,76 @@ class _HomePageState extends State<HomePage> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 10),
+
+              // Baris untuk Requester/Nama
               Row(
                 children: [
                   Icon(
                     Icons.person_outline,
                     size: 16,
-                    color: const Color.fromARGB(255, 0, 0, 0),
+                    color: Colors.grey.shade700,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    ticket.requesterName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color.fromARGB(255, 0, 0, 0),
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      ticket.requesterName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color.fromARGB(255, 0, 0, 0),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
 
-              Text(
-                'Kategori: ${ticket.categoryName}',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: const Color.fromARGB(255, 0, 0, 0),
-                ),
-                overflow: TextOverflow.ellipsis,
+              // Baris untuk Kategori (dengan Ikon baru)
+              Row(
+                children: [
+                  Icon(
+                    Icons.category_outlined, // Ikon baru untuk Kategori
+                    size: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      ticket.categoryName, // Menampilkan nama kategori saja
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color.fromARGB(255, 0, 0, 0),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Baris untuk Unit Kerja (kembali menggunakan Ikon)
+              Row(
+                children: [
+                  Icon(
+                    Icons.business, // Ikon gedung untuk Unit Kerja
+                    size: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      ticket.custom1, // Data Unit Kerja
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color.fromARGB(255, 0, 0, 0),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
 
               Theme(

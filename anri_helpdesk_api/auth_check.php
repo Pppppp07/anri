@@ -9,15 +9,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
     exit();
 }
+
+// --- FUNGSI INI DISEMPURNAKAN AGAR LEBIH TANGGUH ---
 function get_bearer_token() {
+    $authHeader = null;
     $headers = getallheaders();
+
+    // Coba ambil header dari berbagai kemungkinan sumber
     if (isset($headers['Authorization'])) {
-        if (preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
+        $authHeader = $headers['Authorization'];
+    } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        // Fallback untuk beberapa konfigurasi server Apache
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        // Fallback lain yang terkadang diperlukan setelah RewriteRule .htaccess
+        $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+
+    if ($authHeader !== null) {
+        // Jika header ditemukan, ekstrak token dari format "Bearer <token>"
+        if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
             return $matches[1];
         }
     }
+
+    // Jika tidak ada header atau token tidak ditemukan, kembalikan null
     return null;
 }
+// --- AKHIR DARI PENYEMPURNAAN FUNGSI ---
 
 $token_from_user = get_bearer_token();
 
@@ -27,6 +46,7 @@ if (!$token_from_user) {
     exit();
 }
 
+// Logika Anda selanjutnya tidak berubah
 list($selector, $token) = explode(':', $token_from_user);
 
 if (!$selector || !$token) {

@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/config/api_config.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Ticket ticket;
@@ -164,7 +165,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       return;
     }
     final url = Uri.parse(
-      'http://127.0.0.1/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}',
+      '${ApiConfig.baseUrl}/anri_helpdesk_api/get_ticket_details.php?id=${widget.ticket.id}',
     );
     try {
       final response = await http
@@ -220,7 +221,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     };
     try {
       final response = await http.post(
-        Uri.parse('http://127.0.0.1/anri_helpdesk_api/update_ticket.php'),
+        Uri.parse('http://192.168.1.2/anri_helpdesk_api/update_ticket.php'),
         headers: headers,
         body: body,
       );
@@ -267,7 +268,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
     try {
       final response = await http.post(
-        Uri.parse('http://127.0.0.1/anri_helpdesk_api/add_reply.php'),
+        Uri.parse('${ApiConfig.baseUrl}/anri_helpdesk_api/add_reply.php'),
         headers: headers,
         body: {
           'ticket_id': widget.ticket.id.toString(),
@@ -1045,113 +1046,109 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Widget _buildTimeWorkedBar() {
     return Container(
-    // Kita gunakan InkWell agar ada efek saat ditekan untuk edit
-    child: InkWell(
-      onTap: _isResolved ? null : _showTimeWorkedEditor,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue.shade100),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.timer_outlined, size: 28, color: Colors.black54),
-            const SizedBox(width: 12),
-            // ===== PERUBAHAN UTAMA DI SINI =====
-            // Mengelompokkan label dan waktu dalam satu Column
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Waktu Pengerjaan', // Tanda ':' dihilangkan dari sini
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                    fontSize: 14,
+      // Kita gunakan InkWell agar ada efek saat ditekan untuk edit
+      child: InkWell(
+        onTap: _isResolved ? null : _showTimeWorkedEditor,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.shade100),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.timer_outlined, size: 28, color: Colors.black54),
+              const SizedBox(width: 12),
+              // ===== PERUBAHAN UTAMA DI SINI =====
+              // Mengelompokkan label dan waktu dalam satu Column
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Waktu Pengerjaan', // Tanda ':' dihilangkan dari sini
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _formatDuration(_workedDuration),
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue,
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDuration(_workedDuration),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            // ===== AKHIR PERUBAHAN =====
-            const Spacer(),
-            // Tombol start/stop timer
-            IconButton(
-              icon: Icon(
-                _isStopwatchRunning
-                    ? Icons.pause_circle_filled
-                    : Icons.play_circle_filled,
-                size: 32, // Sedikit diperbesar agar mudah ditekan
+                ],
               ),
-              onPressed: _isResolved ? null : _toggleStopwatch,
-              tooltip: _isStopwatchRunning ? 'Stop Timer' : 'Start Timer',
-              color: _isStopwatchRunning
-                  ? Colors.orange.shade700
-                  : Theme.of(context).primaryColor,
-            ),
-          ],
+              // ===== AKHIR PERUBAHAN =====
+              const Spacer(),
+              // Tombol start/stop timer
+              IconButton(
+                icon: Icon(
+                  _isStopwatchRunning
+                      ? Icons.pause_circle_filled
+                      : Icons.play_circle_filled,
+                  size: 32, // Sedikit diperbesar agar mudah ditekan
+                ),
+                onPressed: _isResolved ? null : _toggleStopwatch,
+                tooltip: _isStopwatchRunning ? 'Stop Timer' : 'Start Timer',
+                color: _isStopwatchRunning
+                    ? Colors.orange.shade700
+                    : Theme.of(context).primaryColor,
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
-  Widget _buildActionShortcuts() {
-  // Ganti Wrap dengan Column untuk memastikan tidak ada overflow horizontal
-  return Column(
-    // Gunakan crossAxisAlignment untuk membuat tombol memenuhi lebar
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (_selectedStatus != 'Resolved')
-        ElevatedButton.icon(
-          onPressed: _markAsResolved,
-          icon: Icon(
-            Icons.check_circle_outline,
-            size: 20,
-          ),
-          label: const Text('Tandai Selesai'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade600,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      // Tambahkan spasi antar tombol jika keduanya muncul
-      if (_selectedStatus != 'Resolved' && _assignedTo != widget.currentUserName)
-        const SizedBox(height: 8),
+    );
+  }
 
-      if (_assignedTo != widget.currentUserName)
-        ElevatedButton.icon(
-          onPressed: _assignToMe,
-          icon: Icon(
-            Icons.person_add_alt_1_outlined,
-            size: 20,
-          ),
-          label: const Text('Tugaskan ke Saya'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade600,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+  Widget _buildActionShortcuts() {
+    // Ganti Wrap dengan Column untuk memastikan tidak ada overflow horizontal
+    return Column(
+      // Gunakan crossAxisAlignment untuk membuat tombol memenuhi lebar
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_selectedStatus != 'Resolved')
+          ElevatedButton.icon(
+            onPressed: _markAsResolved,
+            icon: Icon(Icons.check_circle_outline, size: 20),
+            label: const Text('Tandai Selesai'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
-        ),
-    ],
-  );
-}
+        // Tambahkan spasi antar tombol jika keduanya muncul
+        if (_selectedStatus != 'Resolved' &&
+            _assignedTo != widget.currentUserName)
+          const SizedBox(height: 8),
+
+        if (_assignedTo != widget.currentUserName)
+          ElevatedButton.icon(
+            onPressed: _assignToMe,
+            icon: Icon(Icons.person_add_alt_1_outlined, size: 20),
+            label: const Text('Tugaskan ke Saya'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
   Widget _buildStatusEditorRow() {
     return Row(

@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/config/api_config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -104,7 +105,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         _errorMessage = null;
       });
 
-      final url = Uri.parse('http://127.0.0.1/anri_helpdesk_api/login.php');
+      final url = Uri.parse('${ApiConfig.baseUrl}/anri_helpdesk_api/login.php');
 
       try {
         final response = await http
