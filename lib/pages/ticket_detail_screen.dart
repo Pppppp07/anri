@@ -160,7 +160,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   Future<void> _fetchTicketDetails() async {
     setState(() => _isLoadingDetails = true);
     final headers = await _getAuthHeaders();
-fix/perbaikan-final
+
     if (headers.isEmpty) {
       setState(() => _isLoadingDetails = false);
       return;
@@ -205,7 +205,7 @@ fix/perbaikan-final
 
   Future<void> _saveChanges() async {
     setState(() => _isSaving = true);
-fix/perbaikan-final
+
 
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) {
@@ -265,7 +265,7 @@ fix/perbaikan-final
       return;
     }
     setState(() => _isSubmittingReply = true);
- fix/perbaikan-final
+
 
 
     final headers = await _getAuthHeaders();
