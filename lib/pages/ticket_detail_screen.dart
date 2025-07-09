@@ -366,65 +366,54 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   // --- MAIN BUILD METHOD ---
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Color(0xFFE0F2F7), Color(0xFFBBDEFB), Colors.blueAccent],
-          begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: [0.0, 0.4, 0.7, 1.0],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 1,
-          title: Text(widget.ticket.subject, overflow: TextOverflow.ellipsis),
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(icon: Icon(Icons.info_outline), text: "Detail & Tindakan"),
-              Tab(icon: Icon(Icons.forum_outlined), text: "Riwayat & Balas"),
-            ],
-          ),
-        ),
-        body: TabBarView(
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 1,
+        title: Text(widget.ticket.subject, overflow: TextOverflow.ellipsis),
+        bottom: TabBar(
           controller: _tabController,
-          children: [
-            // Mendelegasikan UI Tab 1
-            DetailTabView(
-              ticket: widget.ticket,
-              isResolved: _isResolved,
-              isSaving: _isSaving,
-              workedDuration: _workedDuration,
-              dueDate: _dueDate,
-              selectedStatus: _selectedStatus,
-              selectedPriority: _selectedPriority,
-              selectedCategory: _selectedCategory,
-              assignedTo: _assignedTo,
-              statusOptions: _statusOptions,
-              priorityOptions: _priorityOptions,
-              categoryOptions: widget.allCategories,
-              teamMemberOptions: widget.allTeamMembers,
-              onStatusChanged: (val) { if(val != null) setState(() => _selectedStatus = val); },
-              onPriorityChanged: (val) { if(val != null) setState(() => _selectedPriority = val); },
-              onCategoryChanged: (val) { if(val != null) setState(() => _selectedCategory = val); },
-              onOwnerChanged: (val) { if(val != null) setState(() => _assignedTo = val); },
-              onSaveChanges: _saveChanges,
-              onTapTimeWorked: _showTimeWorkedEditor,
-              onTapDueDate: _showDueDateEditor,
-              onClearDueDate: () => setState(() => _dueDate = null),
-              timeWorkedBar: _buildTimeWorkedBar(),
-              actionShortcuts: _buildActionShortcuts(),
-            ),
-            // Mendelegasikan UI Tab 2
-            ReplyHistoryTabView(
-              isLoadingDetails: _isLoadingDetails,
-              replies: _replies,
-              isResolved: _isResolved,
-              replyForm: _buildReplyForm(),
-            ),
+          tabs: const [
+            Tab(icon: Icon(Icons.info_outline), text: "Detail & Tindakan"),
+            Tab(icon: Icon(Icons.forum_outlined), text: "Riwayat & Balas"),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          DetailTabView(
+            ticket: widget.ticket,
+            isResolved: _isResolved,
+            isSaving: _isSaving,
+            workedDuration: _workedDuration,
+            dueDate: _dueDate,
+            selectedStatus: _selectedStatus,
+            selectedPriority: _selectedPriority,
+            selectedCategory: _selectedCategory,
+            assignedTo: _assignedTo,
+            statusOptions: _statusOptions,
+            priorityOptions: _priorityOptions,
+            categoryOptions: widget.allCategories,
+            teamMemberOptions: widget.allTeamMembers,
+            onStatusChanged: (val) { if(val != null) setState(() => _selectedStatus = val); },
+            onPriorityChanged: (val) { if(val != null) setState(() => _selectedPriority = val); },
+            onCategoryChanged: (val) { if(val != null) setState(() => _selectedCategory = val); },
+            onOwnerChanged: (val) { if(val != null) setState(() => _assignedTo = val); },
+            onSaveChanges: _saveChanges,
+            onTapTimeWorked: _showTimeWorkedEditor,
+            onTapDueDate: _showDueDateEditor,
+            onClearDueDate: () => setState(() => _dueDate = null),
+            timeWorkedBar: _buildTimeWorkedBar(),
+            actionShortcuts: _buildActionShortcuts(),
+          ),
+          ReplyHistoryTabView(
+            isLoadingDetails: _isLoadingDetails,
+            replies: _replies,
+            isResolved: _isResolved,
+            replyForm: _buildReplyForm(),
+          ),
+        ],
       ),
     );
   }
@@ -438,20 +427,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
+          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue.shade100),
+          border: Border.all(color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.timer_outlined, size: 28, color: Colors.black54),
+            Icon(Icons.timer_outlined, size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Waktu Pengerjaan', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 14)),
+                const Text('Waktu Pengerjaan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 2),
-                Text(_formatDuration(_workedDuration), style: const TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w600, color: Colors.blue)),
+                Text(_formatDuration(_workedDuration), style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
               ],
             ),
             const Spacer(),
@@ -459,7 +448,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               icon: Icon(_isStopwatchRunning ? Icons.pause_circle_filled : Icons.play_circle_filled, size: 32),
               onPressed: _isResolved ? null : _toggleStopwatch,
               tooltip: _isStopwatchRunning ? 'Stop Timer' : 'Start Timer',
-              color: _isStopwatchRunning ? Colors.orange.shade700 : Theme.of(context).primaryColor,
+              color: _isStopwatchRunning 
+                  ? Theme.of(context).colorScheme.error 
+                  : Theme.of(context).colorScheme.primary,
             ),
           ],
         ),
@@ -518,8 +509,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               onPressed: _isSubmittingReply ? null : _submitReply,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(110, 58),
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 elevation: 4,
                 textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),

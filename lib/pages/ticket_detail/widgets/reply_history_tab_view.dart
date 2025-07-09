@@ -26,7 +26,7 @@ class ReplyHistoryTabView extends StatelessWidget {
       child: Column(
         children: [
           Card(
-            elevation: 2,
+            elevation: 1,
             shadowColor: Colors.black.withAlpha(26),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             clipBehavior: Clip.antiAlias,
@@ -37,16 +37,18 @@ class ReplyHistoryTabView extends StatelessWidget {
                 initiallyExpanded: true,
                 title: Row(
                   children: [
-                    Icon(Icons.forum_outlined, color: Theme.of(context).primaryColor),
+                    // DIUBAH: Warna ikon dibuat adaptif
+                    Icon(Icons.forum_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
                     const SizedBox(width: 16),
-                    Text("Riwayat Balasan (${replies.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                    // DIUBAH: Warna teks dibuat adaptif
+                    Text("Riwayat Balasan (${replies.length})", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
                 children: [
                   const Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: _buildRepliesList(),
+                    child: _buildRepliesList(context),
                   ),
                 ],
               ),
@@ -65,7 +67,7 @@ class ReplyHistoryTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildRepliesList() {
+  Widget _buildRepliesList(BuildContext context) {
     if (isLoadingDetails) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -91,7 +93,13 @@ class ReplyHistoryTabView extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(reply.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(DateFormat('d MMM yy, HH:mm').format(reply.date), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                Text(
+                  DateFormat('d MMM yy, HH:mm').format(reply.date),
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -104,7 +112,7 @@ class ReplyHistoryTabView extends StatelessWidget {
 
    Widget _buildTitledCard({ required BuildContext context, required IconData icon, required String title, required Widget child }) {
     return Card(
-      elevation: 2,
+      elevation: 1,
       shadowColor: Colors.black.withAlpha(26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -114,8 +122,9 @@ class ReplyHistoryTabView extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: Theme.of(context).primaryColor, size: 20),
-                const SizedBox(width: 8),
+                // DIUBAH: Warna ikon dibuat adaptif
+                Icon(icon, color: Theme.of(context).textTheme.bodyLarge?.color, size: 20),
+                const SizedBox(width: 12),
                 Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),

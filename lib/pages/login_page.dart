@@ -1,3 +1,5 @@
+// lib/pages/login_page.dart
+
 import 'package:anri/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -75,7 +77,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     }
   }
 
-  // --- FUNGSI INI DIRAPIKAN UNTUK MENJADI SATU-SATUNYA SUMBER PENYIMPANAN ---
   Future<void> _saveCredentials({
     required Map<String, dynamic> userData,
     required String token,
@@ -86,13 +87,13 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     await prefs.setString('user_name', userData['name']);
     await prefs.setString('user_username', userData['username']);
     await prefs.setString('user_email', userData['email']);
-    await prefs.setString('auth_token', token); // Simpan token otentikasi
+    await prefs.setString('auth_token', token);
     await prefs.setBool('rememberMe', _rememberMe);
   }
 
   Future<void> _clearCredentials() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove('user_username');
   }
 
   void _handleLogin() async {
@@ -105,9 +106,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         _errorMessage = null;
       });
 
-
       final url = Uri.parse('${ApiConfig.baseUrl}/login.php');
-
 
       try {
         final response = await http
@@ -121,51 +120,42 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             )
             .timeout(const Duration(seconds: 10));
 
-        if (response.statusCode == 200) {
-          final responseData = json.decode(response.body);
+        if (!mounted) return;
 
-          if (responseData['success']) {
-            // --- PERUBAHAN UTAMA DI SINI ---
-            final userData = responseData['user_data'] as Map<String, dynamic>;
-            final String currentUserName = userData['name'];
-            final String? authToken = responseData['token'];
+        final responseData = json.decode(response.body);
 
-            if (authToken != null) {
-              // Jika login sukses dan dapat token, simpan kredensial
-              if (_rememberMe) {
-                await _saveCredentials(userData: userData, token: authToken);
-              } else {
-                await _clearCredentials();
-              }
+        if (response.statusCode == 200 && responseData['success']) {
+          final userData = responseData['user_data'] as Map<String, dynamic>;
+          final String currentUserName = userData['name'];
+          final String? authToken = responseData['token'];
 
-              if (mounted) {
-                // Navigasi ke HomePage dengan membawa nama dan token
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => HomePage(
-                      currentUserName: currentUserName,
-                      authToken: authToken,
-                    ),
-                  ),
-                );
-              }
+          if (authToken != null) {
+            if (_rememberMe) {
+              await _saveCredentials(userData: userData, token: authToken);
             } else {
-              // Handle jika API sukses tapi tidak mengirim token
-              setState(() {
-                _errorMessage = 'Login gagal: Server tidak memberikan token.';
-              });
+              await _clearCredentials();
+            }
+
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomePage(
+                    currentUserName: currentUserName,
+                    authToken: authToken,
+                  ),
+                ),
+              );
             }
           } else {
             setState(() {
-              _errorMessage =
-                  responseData['message'] ?? 'Username atau password salah.';
+              _errorMessage = 'Login gagal: Server tidak memberikan token.';
             });
           }
         } else {
           setState(() {
             _errorMessage =
-                'Gagal terhubung ke server (Error: ${response.statusCode})';
+                responseData['message'] ?? 'Username atau password salah.';
           });
         }
       } catch (e) {
@@ -186,24 +176,31 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // Seluruh UI (build method) tidak ada perubahan sama sekali
+    // DIUBAH: Latar belakang sekarang adaptif terhadap tema
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final loginPageDecoration = BoxDecoration(
+      gradient: LinearGradient(
+        colors: isDarkMode
+            ? [
+                Theme.of(context).colorScheme.surface,
+                Theme.of(context).colorScheme.background
+              ]
+            : [
+                Colors.white,
+                const Color(0xFFE0F2F7),
+                const Color(0xFFBBDEFB),
+                Colors.blueAccent
+              ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ),
+    );
+
     return Scaffold(
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white,
-                Color(0xFFE0F2F7),
-                Color(0xFFBBDEFB),
-                Colors.blueAccent,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              stops: [0.0, 0.4, 0.7, 1.0],
-            ),
-          ),
+          decoration: loginPageDecoration,
           child: FadeTransition(
             opacity: _fadeAnimation,
             child: LayoutBuilder(
@@ -234,14 +231,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             animation: _auroraController,
                             builder: (context, child) {
                               final double value = _auroraController.value;
-                              final Alignment begin = Alignment(
-                                math.sin(value * 2 * math.pi * 1.2),
-                                math.cos(value * 2 * math.pi),
-                              );
-                              final Alignment end = Alignment(
-                                math.cos(value * 2 * math.pi),
-                                math.sin(value * 2 * math.pi * 1.5),
-                              );
                               return ShaderMask(
                                 shaderCallback: (bounds) => LinearGradient(
                                   colors: [
@@ -249,8 +238,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                     Colors.blue.shade700,
                                     Colors.lightBlueAccent,
                                   ],
-                                  begin: begin,
-                                  end: end,
+                                  begin: Alignment(math.sin(value * 2 * math.pi * 1.2), math.cos(value * 2 * math.pi)),
+                                  end: Alignment(math.cos(value * 2 * math.pi), math.sin(value * 2 * math.pi * 1.5)),
                                 ).createShader(bounds),
                                 child: const Text(
                                   'Helpdesk',
@@ -269,24 +258,21 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             controller: _usernameController,
                             keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
-                            onFieldSubmitted: (_) => FocusScope.of(
-                              context,
-                            ).requestFocus(_passwordFocusNode),
-                            decoration: const InputDecoration(
+                            onFieldSubmitted: (_) =>
+                                FocusScope.of(context).requestFocus(_passwordFocusNode),
+                            decoration: InputDecoration(
                               labelText: 'Username',
-                              hintText: 'Enter your Username',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(12),
-                                ),
+                              hintText: 'Masukkan username Anda',
+                              border: const OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(12)),
                               ),
-                              prefixIcon: Icon(Icons.person),
+                              prefixIcon: const Icon(Icons.person),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: Theme.of(context).colorScheme.surface,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Username or cannot be empty';
+                                return 'Username tidak boleh kosong';
                               }
                               return null;
                             },
@@ -300,11 +286,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             onFieldSubmitted: (_) => _handleLogin(),
                             decoration: InputDecoration(
                               labelText: 'Password',
-                              hintText: 'Enter your Password',
+                              hintText: 'Masukkan password Anda',
                               border: const OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(12),
-                                ),
+                                borderRadius: BorderRadius.all(Radius.circular(12)),
                               ),
                               prefixIcon: const Icon(Icons.lock),
                               suffixIcon: IconButton(
@@ -314,16 +298,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                       : Icons.visibility_off,
                                 ),
                                 onPressed: () => setState(
-                                  () =>
-                                      _isPasswordVisible = !_isPasswordVisible,
+                                  () => _isPasswordVisible = !_isPasswordVisible,
                                 ),
                               ),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: Theme.of(context).colorScheme.surface,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Password cannot be empty';
+                                return 'Password tidak boleh kosong';
                               }
                               return null;
                             },
@@ -338,12 +321,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                     value: _rememberMe,
                                     onChanged: (bool? newValue) =>
                                         setState(() => _rememberMe = newValue!),
-                                    activeColor: Colors.blue.shade700,
+                                    activeColor: Theme.of(context).primaryColor,
                                   ),
-                                  const Text(
-                                    'Remember Me',
-                                    style: TextStyle(color: Colors.blueGrey),
-                                  ),
+                                  const Text('Ingat Saya'),
                                 ],
                               ),
                             ],
@@ -355,7 +335,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               child: Text(
                                 _errorMessage!,
                                 style: const TextStyle(
-                                  color: Colors.red,
+                                  color: Colors.redAccent,
                                   fontWeight: FontWeight.bold,
                                 ),
                                 textAlign: TextAlign.center,
@@ -367,26 +347,19 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade700,
-                                foregroundColor: Colors.white,
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 elevation: 8,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                               child: _isLoading
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
+                                  ? const CircularProgressIndicator(color: Colors.white)
                                   : const Text(
                                       'LOGIN',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                     ),
                             ),
                           ),

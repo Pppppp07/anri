@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+  local_auth: ^2.2.0
   shared_preferences: ^2.2.3
   particles_flutter: ^0.1.4
   cupertino_icons: ^1.0.8

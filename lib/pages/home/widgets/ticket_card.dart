@@ -22,15 +22,19 @@ class TicketCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final DateFormat formatter = DateFormat('d MMM yy, HH:mm', 'id_ID');
+    // DIUBAH: Warna ID tiket dibuat adaptif
+    final Color idColor = Theme.of(context).brightness == Brightness.dark 
+        ? Colors.lightBlue.shade300 
+        : Theme.of(context).primaryColor;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.05),
+      elevation: 1,
+      shadowColor: Colors.black.withOpacity(0.1),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () async {
-          // Navigasi tetap di sini karena ini adalah aksi dari kartu
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -42,7 +46,6 @@ class TicketCard extends StatelessWidget {
               ),
             ),
           );
-          // Refresh logic akan ditangani oleh provider jika diperlukan setelah pop
         },
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -55,7 +58,7 @@ class TicketCard extends StatelessWidget {
                   Text(
                     '#${ticket.trackid}',
                     style: TextStyle(
-                      color: Theme.of(context).primaryColor,
+                      color: idColor, // Menggunakan warna adaptif
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -64,7 +67,7 @@ class TicketCard extends StatelessWidget {
                     children: [
                       _buildStatusChip(ticket.statusText),
                       const SizedBox(width: 8),
-                      _buildPriorityChip(ticket.priorityText),
+                      _buildPriorityChip(context, ticket.priorityText),
                     ],
                   ),
                 ],
@@ -72,20 +75,16 @@ class TicketCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 ticket.subject,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black87,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 10),
-              _buildInfoRow(icon: Icons.person_outline, text: ticket.requesterName),
+              _buildInfoRow(context: context, icon: Icons.person_outline, text: ticket.requesterName),
               const SizedBox(height: 8),
-              _buildInfoRow(icon: Icons.category_outlined, text: ticket.categoryName),
+              _buildInfoRow(context: context, icon: Icons.category_outlined, text: ticket.categoryName),
               const SizedBox(height: 8),
-              _buildInfoRow(icon: Icons.business, text: ticket.custom1),
+              _buildInfoRow(context: context, icon: Icons.business, text: ticket.custom1),
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
@@ -110,8 +109,6 @@ class TicketCard extends StatelessWidget {
     );
   }
 
-  // --- WIDGET HELPERS KHUSUS UNTUK KARTU INI ---
-
   Widget _buildStatusChip(String status) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -126,7 +123,7 @@ class TicketCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPriorityChip(String priority) {
+  Widget _buildPriorityChip(BuildContext context, String priority) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -135,7 +132,7 @@ class TicketCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Image.asset(_getPriorityIconPath(priority), height: 12, width: 12),
+          Image.asset(_getPriorityIconPath(priority), height: 12, width: 12, color: _getPriorityColor(priority)),
           const SizedBox(width: 4),
           Text(
             priority,
@@ -146,15 +143,16 @@ class TicketCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow({required IconData icon, required String text}) {
+  Widget _buildInfoRow({required BuildContext context, required IconData icon, required String text}) {
+    final Color iconColor = Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey;
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade700),
+        Icon(icon, size: 16, color: iconColor.withOpacity(0.7)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -168,7 +166,7 @@ class TicketCard extends StatelessWidget {
       children: [
         SizedBox(
           width: 112,
-          child: Text('$label:', style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+          child: Text('$label:', style: const TextStyle(fontSize: 14, color: Colors.grey)),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -183,11 +181,8 @@ class TicketCard extends StatelessWidget {
       ],
     );
   }
-
-  // --- FUNGSI HELPER WARNA & IKON ---
   
   Color _getStatusColor(String status) {
-    // ... (salin fungsi _getStatusColor dari home_page.dart)
     switch (status) {
       case 'New': return const Color(0xFFD32F2F);
       case 'Waiting Reply': return const Color(0xFFE65100);
@@ -200,7 +195,6 @@ class TicketCard extends StatelessWidget {
   }
 
   String _getPriorityIconPath(String priority) {
-    // ... (salin fungsi _getPriorityIconPath dari home_page.dart)
      switch (priority) {
       case 'Critical': return 'assets/images/label-critical.png';
       case 'High': return 'assets/images/label-high.png';
@@ -211,13 +205,12 @@ class TicketCard extends StatelessWidget {
   }
 
   Color _getPriorityColor(String priority) {
-    // ... (salin fungsi _getPriorityColor dari home_page.dart)
     switch (priority) {
-      case 'Critical': return Colors.red.shade700;
-      case 'High': return Colors.orange.shade800;
-      case 'Medium': return Colors.green.shade700;
-      case 'Low': return Colors.blue.shade700;
-      default: return Colors.grey.shade700;
+      case 'Critical': return Colors.red.shade400;
+      case 'High': return Colors.orange.shade400;
+      case 'Medium': return Colors.lightGreen.shade400;
+      case 'Low': return Colors.lightBlue.shade400;
+      default: return Colors.grey;
     }
   }
 }

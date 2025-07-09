@@ -1,5 +1,7 @@
+// lib/pages/profile_page.dart
+
 import 'package:anri/pages/login_page.dart';
-import 'package:anri/pages/settings_page.dart'; // Import halaman pengaturan
+import 'package:anri/pages/settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,8 +27,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (mounted) {
       setState(() {
         _userName = prefs.getString('user_name') ?? 'Nama Tidak Ditemukan';
-        _userEmail =
-            prefs.getString('user_email') ?? 'email@tidakditemukan.com';
+        _userEmail = prefs.getString('user_email') ?? 'email@tidakditemukan.com';
       });
     }
   }
@@ -53,18 +54,23 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     );
 
-    if (confirm == true) {
+    if (confirm == true && mounted) {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      await prefs.setBool('isLoggedIn', false);
+      final bool rememberMe = prefs.getBool('rememberMe') ?? false;
+      final String? username = prefs.getString('user_username');
 
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (Route<dynamic> route) => false,
-        );
+      await prefs.clear();
+
+      if (rememberMe && username != null) {
+        await prefs.setString('user_username', username);
+        await prefs.setBool('rememberMe', true);
       }
+      
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (Route<dynamic> route) => false,
+      );
     }
   }
 
@@ -92,9 +98,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.grey[200],
-      child: Column(
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: Column(
         children: [
           _buildProfileHeader(),
           Expanded(
@@ -120,11 +126,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   subtitle: 'Lihat versi dan informasi aplikasi',
                   onTap: () => _showAboutDialog(context),
                 ),
+                const SizedBox(height: 16),
                 _buildProfileMenuItem(
                   icon: Icons.logout,
                   title: 'Logout',
                   subtitle: 'Keluar dari sesi Anda saat ini',
-                  color: Colors.red,
+                  color: Colors.redAccent,
                   onTap: () => _logout(context),
                 ),
               ],
@@ -136,47 +143,62 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileHeader() {
-    // Menghitung tinggi status bar dan AppBar secara dinamis
     final double statusBarHeight = MediaQuery.of(context).padding.top;
-    final double appBarHeight = kToolbarHeight; // Tinggi AppBar standar Flutter
+    final double appBarHeight = kToolbarHeight;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      // Padding atas disesuaikan agar konten tidak tertimpa status bar dan AppBar transparan
-      padding: EdgeInsets.only(top: statusBarHeight + appBarHeight, bottom: 20),
+      padding: EdgeInsets.only(top: statusBarHeight + appBarHeight, bottom: 24, left: 16, right: 16),
+      width: double.infinity,
       decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
         gradient: LinearGradient(
-          colors: [Colors.blue.shade400, Colors.blue.shade700],
+          colors: isDarkMode
+              ? [
+                  Theme.of(context).colorScheme.surface,
+                  Theme.of(context).colorScheme.surface.withAlpha(220)
+                ]
+              : [Colors.blue.shade400, Colors.blue.shade700],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ]
       ),
-      child: Center(
-        child: Column(
-          children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.white,
-              child: Icon(Icons.person, size: 60, color: Colors.blue),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 50,
+            backgroundColor: Theme.of(context).colorScheme.background,
+            child: Icon(
+              Icons.person,
+              size: 60,
+              color: Theme.of(context).colorScheme.primary,
             ),
-            const SizedBox(height: 16),
-            Text(
-              _userName,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _userName,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-            const SizedBox(height: 4),
-            Text(
-              _userEmail,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white.withOpacity(0.9),
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _userEmail,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.8),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -188,18 +210,20 @@ class _ProfilePageState extends State<ProfilePage> {
     required VoidCallback onTap,
     Color? color,
   }) {
+    final iconColor = color ?? Theme.of(context).colorScheme.secondary;
+
     return Card(
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      elevation: 1,
+      shadowColor: Theme.of(context).shadowColor.withOpacity(0.1),
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(icon, color: color ?? Theme.of(context).primaryColor),
+        leading: Icon(icon, color: iconColor),
         title: Text(
           title,
           style: TextStyle(fontWeight: FontWeight.bold, color: color),
         ),
-        subtitle: Text(subtitle, style: TextStyle(color: Colors.grey.shade600)),
+        subtitle: Text(subtitle, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

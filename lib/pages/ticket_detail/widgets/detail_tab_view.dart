@@ -71,14 +71,14 @@ class DetailTabView extends StatelessWidget {
             context: context,
             icon: Icons.person_pin_circle_outlined,
             title: "Informasi Kontak & Status",
-            child: _buildInfoCardContent(),
+            child: _buildInfoCardContent(context),
           ),
           const SizedBox(height: 16),
           _buildTitledCard(
             context: context,
             icon: Icons.list_alt_outlined,
             title: "Detail Tiket",
-            child: _buildTicketDetailsContent(),
+            child: _buildTicketDetailsContent(context),
           ),
           const SizedBox(height: 16),
           _buildDescriptionCard(context),
@@ -97,18 +97,18 @@ class DetailTabView extends StatelessWidget {
 
   // --- WIDGET BUILDER ---
 
-  Widget _buildInfoCardContent() {
+  Widget _buildInfoCardContent(BuildContext context) {
     return Column(
       children: [
-        _buildInfoRow(Icons.bookmark_border, 'Status:', ticket.statusText, statusColor: _getStatusColor(ticket.statusText)),
-        _buildInfoRow(Icons.person_outline, 'Contact:', ticket.requesterName),
-        _buildInfoRow(Icons.business_outlined, 'Unit Kerja:', ticket.custom1),
-        _buildInfoRow(Icons.phone_outlined, 'No Ext/Hp:', ticket.custom2),
+        _buildInfoRow(context, Icons.bookmark_border, 'Status:', ticket.statusText, statusColor: _getStatusColor(ticket.statusText)),
+        _buildInfoRow(context, Icons.person_outline, 'Contact:', ticket.requesterName),
+        _buildInfoRow(context, Icons.business_outlined, 'Unit Kerja:', ticket.custom1),
+        _buildInfoRow(context, Icons.phone_outlined, 'No Ext/Hp:', ticket.custom2),
       ],
     );
   }
 
-  Widget _buildTicketDetailsContent() {
+  Widget _buildTicketDetailsContent(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
     String formatDuration(Duration duration) {
       String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -117,19 +117,21 @@ class DetailTabView extends StatelessWidget {
 
     return Column(
       children: [
-        _buildStaticInfoRow("Tracking ID:", ticket.trackid),
-        _buildStaticInfoRow("Created on:", dateFormat.format(ticket.creationDate)),
-        _buildStaticInfoRow("Updated:", dateFormat.format(ticket.lastChange)),
-        _buildStaticInfoRow("Replies:", ticket.replies.toString()),
-        _buildStaticInfoRow("Last replier:", ticket.lastReplierText),
+        _buildStaticInfoRow(context, "Tracking ID:", ticket.trackid),
+        _buildStaticInfoRow(context, "Created on:", dateFormat.format(ticket.creationDate)),
+        _buildStaticInfoRow(context, "Updated:", dateFormat.format(ticket.lastChange)),
+        _buildStaticInfoRow(context, "Replies:", ticket.replies.toString()),
+        _buildStaticInfoRow(context, "Last replier:", ticket.lastReplierText),
         _buildEditableInfoRow(
+          context,
           "Time worked:",
           formatDuration(workedDuration),
           onTap: isResolved ? null : onTapTimeWorked,
         ),
         _buildEditableInfoRow(
+          context,
           "Due date:",
-          dueDate != null ? dateFormat.format(dueDate!) : 'None',
+          dueDate != null ? DateFormat('yyyy-MM-dd').format(dueDate!) : 'None',
           onTap: isResolved ? null : onTapDueDate,
           onClear: (isResolved || dueDate == null) ? null : onClearDueDate,
         ),
@@ -139,7 +141,7 @@ class DetailTabView extends StatelessWidget {
   
   Widget _buildDescriptionCard(BuildContext context) {
     return Card(
-      elevation: 2,
+      elevation: 1,
       shadowColor: Colors.black.withAlpha(26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
@@ -149,9 +151,9 @@ class DetailTabView extends StatelessWidget {
           maintainState: true,
           initiallyExpanded: false,
           title: Row(children: [
-            Icon(Icons.description_outlined, color: Theme.of(context).primaryColor),
+            Icon(Icons.description_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
             const SizedBox(width: 16),
-            const Text("Deskripsi Permasalahan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+            const Text("Deskripsi Permasalahan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ]),
           children: [
             const Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
@@ -169,6 +171,21 @@ class DetailTabView extends StatelessWidget {
   }
 
   Widget _buildTindakanContent(BuildContext context) {
+    if (isResolved) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle, color: Colors.green.shade700, size: 40),
+              const SizedBox(height: 16),
+              const Text('Tiket ini sudah selesai.', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+      );
+    }
     return Column(
       children: [
         timeWorkedBar,
@@ -185,8 +202,8 @@ class DetailTabView extends StatelessWidget {
             label: isSaving ? const SizedBox.shrink() : const Text("Simpan Perubahan"),
             onPressed: isSaving ? null : onSaveChanges,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               elevation: 4,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
             ),
@@ -209,17 +226,17 @@ class DetailTabView extends StatelessWidget {
 
   // --- HELPER WIDGETS ---
 
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? statusColor}) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value, {Color? statusColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: Colors.grey.shade600),
+          Icon(icon, size: 18, color: Theme.of(context).textTheme.bodySmall?.color),
           const SizedBox(width: 12),
           SizedBox(
             width: 95,
-            child: Text(label, style: TextStyle(color: Colors.grey.shade700)),
+            child: Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
           ),
           Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: statusColor))),
         ],
@@ -227,26 +244,26 @@ class DetailTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildStaticInfoRow(String label, String value) {
+  Widget _buildStaticInfoRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600)),
+          Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildEditableInfoRow(String label, String value, {VoidCallback? onTap, VoidCallback? onClear}) {
+  Widget _buildEditableInfoRow(BuildContext context, String label, String value, {VoidCallback? onTap, VoidCallback? onClear}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600)),
+          Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
           InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(4),
@@ -258,9 +275,7 @@ class DetailTabView extends StatelessWidget {
                     value,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: onTap != null ? Colors.blue.shade700 : null,
-                      decoration: onTap != null ? TextDecoration.underline : null,
-                      decorationStyle: TextDecorationStyle.dotted,
+                      color: onTap != null ? Theme.of(context).colorScheme.primary : null,
                     ),
                   ),
                   if (onClear != null) ...[
@@ -268,7 +283,7 @@ class DetailTabView extends StatelessWidget {
                     InkWell(
                       onTap: onClear,
                       borderRadius: BorderRadius.circular(20),
-                      child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                      child: Icon(Icons.clear, size: 16, color: Theme.of(context).textTheme.bodySmall?.color),
                     )
                   ]
                 ],
@@ -313,7 +328,7 @@ class DetailTabView extends StatelessWidget {
 
   Widget _buildTitledCard({required BuildContext context, required IconData icon, required String title, required Widget child}) {
     return Card(
-      elevation: 2,
+      elevation: 1,
       shadowColor: Colors.black.withAlpha(26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -323,8 +338,8 @@ class DetailTabView extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: Theme.of(context).primaryColor, size: 20),
-                const SizedBox(width: 8),
+                Icon(icon, color: Theme.of(context).textTheme.bodyLarge?.color, size: 20),
+                const SizedBox(width: 12),
                 Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),

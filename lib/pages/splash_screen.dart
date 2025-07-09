@@ -1,8 +1,14 @@
+// lib/pages/splash_screen.dart
+
 import 'package:anri/home_page.dart';
 import 'package:anri/pages/login_page.dart';
+import 'package:anri/providers/settings_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:local_auth/local_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -24,58 +30,114 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 10),
     )..repeat();
 
-    _checkLoginStatus();
+    // Memanggil fungsi utama setelah frame pertama selesai di-render
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkLoginStatus();
+    });
   }
 
-  // --- FUNGSI DIPERBAIKI SECARA TOTAL ---
+  // Fungsi utama yang menangani alur pembukaan aplikasi
   Future<void> _checkLoginStatus() async {
     // Beri jeda agar splash screen terlihat
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(milliseconds: 2500));
+    
+    // Pastikan widget masih ada sebelum menggunakan context
+    if (!mounted) return;
+
+    final settingsProvider = context.read<SettingsProvider>();
+    
+    // --- PERBAIKAN UTAMA ADA DI SINI ---
+    // Baris ini 'memaksa' aplikasi untuk menunggu sampai semua pengaturan
+    // (termasuk status kunci aplikasi) selesai dimuat dari memori.
+    await settingsProvider.loadSettings();
+    // ------------------------------------
+
+    // Setelah 'await' di atas, nilai ini dijamin yang paling update.
+    final bool appLockEnabled = settingsProvider.isAppLockEnabled;
 
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
-    if (mounted) {
-      if (isLoggedIn) {
-        // PERBAIKAN: Baca NAMA PENGGUNA dan TOKEN OTENTIKASI
-        final String? userName = prefs.getString('user_name');
-        final String? authToken = prefs.getString('auth_token');
+    if (!mounted) return;
 
-        // Navigasi ke HomePage HANYA JIKA kedua data penting ini ada
-        if (userName != null && authToken != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomePage(
-                currentUserName: userName,
-                authToken: authToken, // Kirim token juga
-              ),
-            ),
-          );
-        } else {
-          // Jika salah satu data sesi (nama atau token) tidak ada,
-          // anggap sesi tidak valid dan paksa login ulang.
-          _navigateToLogin();
+    // Jika pengguna sudah login sebelumnya
+    if (isLoggedIn) {
+      // DAN kunci aplikasi aktif, maka minta otentikasi
+      if (appLockEnabled) {
+        bool authenticated = await _authenticateWithExit();
+        // Jika otentikasi berhasil, baru masuk ke halaman utama
+        if (authenticated) {
+          _navigateToHome(prefs);
         }
       } else {
-        // Jika belum login, ke LoginPage
-        _navigateToLogin();
+        // Jika tidak ada kunci aplikasi, langsung masuk ke halaman utama
+        _navigateToHome(prefs);
       }
+    } else {
+      // Jika belum login, selalu ke halaman login
+      _navigateToLogin();
     }
   }
 
+  // Fungsi untuk otentikasi, akan menutup aplikasi jika gagal atau dibatalkan
+  Future<bool> _authenticateWithExit() async {
+    final LocalAuthentication auth = LocalAuthentication();
+    try {
+      final bool canAuthenticate = await auth.canCheckBiometrics || await auth.isDeviceSupported();
+      if (!canAuthenticate) {
+        // Jika perangkat tidak mendukung, anggap saja berhasil agar tidak terkunci selamanya
+        return true;
+      }
+
+      return await auth.authenticate(
+        localizedReason: 'Silakan otentikasi untuk membuka aplikasi ANRI Helpdesk',
+        options: const AuthenticationOptions(
+          stickyAuth: true, // Dialog tidak hilang jika aplikasi ke background
+          biometricOnly: false, // Izinkan PIN/Pola jika biometrik gagal
+        ),
+      );
+    } on PlatformException catch (e) {
+      debugPrint("Error otentikasi: $e");
+      // Jika pengguna membatalkan atau terjadi error, tutup aplikasi
+      SystemNavigator.pop();
+      return false;
+    }
+  }
+
+  // Helper untuk navigasi ke halaman utama
+  void _navigateToHome(SharedPreferences prefs) {
+    final String? userName = prefs.getString('user_name');
+    final String? authToken = prefs.getString('auth_token');
+
+    if (userName != null && authToken != null && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomePage(
+            currentUserName: userName,
+            authToken: authToken,
+          ),
+        ),
+      );
+    } else {
+      _navigateToLogin();
+    }
+  }
+
+  // Helper untuk navigasi ke halaman login
   void _navigateToLogin() {
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 1000),
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const LoginPage(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    );
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 1000),
+          pageBuilder: (context, animation, secondaryAnimation) => const LoginPage(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+      );
+    }
   }
 
   @override
@@ -88,17 +150,14 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.white,
-              Color(0xFFE0F2F7),
-              Color(0xFFBBDEFB),
-              Colors.blueAccent,
-            ],
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? [const Color(0xFF2c3e50), const Color(0xFF212f3c)]
+                : [Colors.white, const Color(0xFFE0F2F7), const Color(0xFFBBDEFB), Colors.blueAccent],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            stops: [0.0, 0.4, 0.7, 1.0],
+            stops: const [0.0, 0.4, 0.7, 1.0],
           ),
         ),
         child: Center(
