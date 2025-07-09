@@ -374,6 +374,7 @@ class _HomePageState extends State<HomePage> {
                                       .toList(),
                                   allTeamMembers: _teamMembers,
                                   currentUserName: widget.currentUserName,
+                                  onRefresh: _triggerSearch,
                                 );
                               } else {
                                 return _buildPaginationControl(provider);

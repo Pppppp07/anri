@@ -20,7 +20,7 @@ class DetailTabView extends StatelessWidget {
   final List<String> priorityOptions;
   final List<String> categoryOptions;
   final List<String> teamMemberOptions;
-  
+
   // --- Widget & Callback ---
   final Widget timeWorkedBar;
   final Widget actionShortcuts;
@@ -32,7 +32,7 @@ class DetailTabView extends StatelessWidget {
   final VoidCallback onTapTimeWorked;
   final VoidCallback onTapDueDate;
   final VoidCallback onClearDueDate;
-  
+
   const DetailTabView({
     super.key,
     required this.ticket,
@@ -74,14 +74,16 @@ class DetailTabView extends StatelessWidget {
             child: _buildInfoCardContent(context),
           ),
           const SizedBox(height: 16),
+          // PINDAHKAN KARTU DESKRIPSI KE ATAS SINI
+          _buildDescriptionCard(context),
+          const SizedBox(height: 16),
+          // PINDAHKAN KARTU DETAIL TIKET KE BAWAH SINI
           _buildTitledCard(
             context: context,
             icon: Icons.list_alt_outlined,
             title: "Detail Tiket",
             child: _buildTicketDetailsContent(context),
           ),
-          const SizedBox(height: 16),
-          _buildDescriptionCard(context),
           const SizedBox(height: 16),
           if (!isResolved)
             _buildTitledCard(
@@ -100,10 +102,31 @@ class DetailTabView extends StatelessWidget {
   Widget _buildInfoCardContent(BuildContext context) {
     return Column(
       children: [
-        _buildInfoRow(context, Icons.bookmark_border, 'Status:', ticket.statusText, statusColor: _getStatusColor(ticket.statusText)),
-        _buildInfoRow(context, Icons.person_outline, 'Contact:', ticket.requesterName),
-        _buildInfoRow(context, Icons.business_outlined, 'Unit Kerja:', ticket.custom1),
-        _buildInfoRow(context, Icons.phone_outlined, 'No Ext/Hp:', ticket.custom2),
+        _buildInfoRow(
+          context,
+          Icons.bookmark_border,
+          'Status:',
+          ticket.statusText,
+          statusColor: _getStatusColor(ticket.statusText),
+        ),
+        _buildInfoRow(
+          context,
+          Icons.person_outline,
+          'Contact:',
+          ticket.requesterName,
+        ),
+        _buildInfoRow(
+          context,
+          Icons.business_outlined,
+          'Unit Kerja:',
+          ticket.custom1,
+        ),
+        _buildInfoRow(
+          context,
+          Icons.phone_outlined,
+          'No Ext/Hp:',
+          ticket.custom2,
+        ),
       ],
     );
   }
@@ -118,8 +141,16 @@ class DetailTabView extends StatelessWidget {
     return Column(
       children: [
         _buildStaticInfoRow(context, "Tracking ID:", ticket.trackid),
-        _buildStaticInfoRow(context, "Created on:", dateFormat.format(ticket.creationDate)),
-        _buildStaticInfoRow(context, "Updated:", dateFormat.format(ticket.lastChange)),
+        _buildStaticInfoRow(
+          context,
+          "Created on:",
+          dateFormat.format(ticket.creationDate),
+        ),
+        _buildStaticInfoRow(
+          context,
+          "Updated:",
+          dateFormat.format(ticket.lastChange),
+        ),
         _buildStaticInfoRow(context, "Replies:", ticket.replies.toString()),
         _buildStaticInfoRow(context, "Last replier:", ticket.lastReplierText),
         _buildEditableInfoRow(
@@ -138,7 +169,7 @@ class DetailTabView extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildDescriptionCard(BuildContext context) {
     return Card(
       elevation: 1,
@@ -147,21 +178,63 @@ class DetailTabView extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        // DIUBAH: initiallyExpanded menjadi true agar kartu selalu terbuka
         child: ExpansionTile(
           maintainState: true,
-          initiallyExpanded: false,
-          title: Row(children: [
-            Icon(Icons.description_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
-            const SizedBox(width: 16),
-            const Text("Deskripsi Permasalahan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ]),
+          initiallyExpanded: true,
+          title: Row(
+            children: [
+              Icon(
+                Icons.description_outlined,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                "Deskripsi Permasalahan",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
           children: [
             const Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Html(
-                data: ticket.message,
-                style: {"body": Style(margin: Margins.zero, padding: HtmlPaddings.zero, fontSize: FontSize(15.0), lineHeight: LineHeight.em(1.4))},
+              // DIUBAH: Bungkus dengan Column untuk menambahkan subjek
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // BARIS BARU UNTUK SUBJEK
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Subject: ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Expanded(
+                        child: Text(
+                          ticket.subject,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  // KONTEN PESAN YANG SUDAH ADA
+                  Html(
+                    data: ticket.message,
+                    style: {
+                      "body": Style(
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                        fontSize: FontSize(15.0),
+                        lineHeight: LineHeight.em(1.4),
+                      ),
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -180,7 +253,10 @@ class DetailTabView extends StatelessWidget {
             children: [
               Icon(Icons.check_circle, color: Colors.green.shade700, size: 40),
               const SizedBox(height: 16),
-              const Text('Tiket ini sudah selesai.', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text(
+                'Tiket ini sudah selesai.',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
         ),
@@ -198,47 +274,106 @@ class DetailTabView extends StatelessWidget {
           width: double.infinity,
           height: 50,
           child: ElevatedButton.icon(
-            icon: isSaving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)) : const Icon(Icons.save_outlined),
-            label: isSaving ? const SizedBox.shrink() : const Text("Simpan Perubahan"),
+            icon: isSaving
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: isSaving
+                ? const SizedBox.shrink()
+                : const Text("Simpan Perubahan"),
             onPressed: isSaving ? null : onSaveChanges,
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
               elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
             ),
           ),
         ),
       ],
     );
   }
-  
+
   Widget _buildEditorRows(BuildContext context) {
     return Column(
       children: [
-        _buildDropdownRow(context: context, label: 'Ticket status:', value: selectedStatus, items: statusOptions, onChanged: onStatusChanged, isStatus: true),
-        _buildDropdownRow(context: context, label: 'Priority:', value: selectedPriority, items: priorityOptions, onChanged: onPriorityChanged),
-        _buildDropdownRow(context: context, label: 'Category:', value: selectedCategory, items: categoryOptions, onChanged: onCategoryChanged),
-        _buildDropdownRow(context: context, label: 'Assigned to:', value: assignedTo, items: teamMemberOptions, onChanged: onOwnerChanged),
+        _buildDropdownRow(
+          context: context,
+          label: 'Ticket status:',
+          value: selectedStatus,
+          items: statusOptions,
+          onChanged: onStatusChanged,
+          isStatus: true,
+        ),
+        _buildDropdownRow(
+          context: context,
+          label: 'Priority:',
+          value: selectedPriority,
+          items: priorityOptions,
+          onChanged: onPriorityChanged,
+          isPriority: true,
+        ),
+        _buildDropdownRow(
+          context: context,
+          label: 'Category:',
+          value: selectedCategory,
+          items: categoryOptions,
+          onChanged: onCategoryChanged,
+        ),
+        _buildDropdownRow(
+          context: context,
+          label: 'Assigned to:',
+          value: assignedTo,
+          items: teamMemberOptions,
+          onChanged: onOwnerChanged,
+        ),
       ],
     );
   }
 
   // --- HELPER WIDGETS ---
 
-  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value, {Color? statusColor}) {
+  Widget _buildInfoRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value, {
+    Color? statusColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: Theme.of(context).textTheme.bodySmall?.color),
+          Icon(
+            icon,
+            size: 18,
+            color: Theme.of(context).textTheme.bodySmall?.color,
+          ),
           const SizedBox(width: 12),
           SizedBox(
             width: 95,
-            child: Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
+            ),
           ),
-          Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: statusColor))),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+            ),
+          ),
         ],
       ),
     );
@@ -250,20 +385,36 @@ class DetailTabView extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildEditableInfoRow(BuildContext context, String label, String value, {VoidCallback? onTap, VoidCallback? onClear}) {
+  Widget _buildEditableInfoRow(
+    BuildContext context,
+    String label,
+    String value, {
+    VoidCallback? onTap,
+    VoidCallback? onClear,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+          ),
           InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(4),
@@ -275,7 +426,9 @@ class DetailTabView extends StatelessWidget {
                     value,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: onTap != null ? Theme.of(context).colorScheme.primary : null,
+                      color: onTap != null
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
                     ),
                   ),
                   if (onClear != null) ...[
@@ -283,9 +436,13 @@ class DetailTabView extends StatelessWidget {
                     InkWell(
                       onTap: onClear,
                       borderRadius: BorderRadius.circular(20),
-                      child: Icon(Icons.clear, size: 16, color: Theme.of(context).textTheme.bodySmall?.color),
-                    )
-                  ]
+                      child: Icon(
+                        Icons.clear,
+                        size: 16,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -295,12 +452,25 @@ class DetailTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildDropdownRow({required BuildContext context, required String label, required String value, required List<String> items, required ValueChanged<String?> onChanged, bool isStatus = false}) {
+  Widget _buildDropdownRow({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    bool isStatus = false,
+    bool isPriority = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+          ),
           Expanded(
             flex: 2,
             child: DropdownButtonHideUnderline(
@@ -308,14 +478,40 @@ class DetailTabView extends StatelessWidget {
                 value: value,
                 isExpanded: true,
                 items: items.map((String item) {
-                  return DropdownMenuItem<String>(
-                    value: item,
-                    child: Text(
+                  Widget child;
+                  // LOGIKA BARU UNTUK MEMILIH TAMPILAN ITEM
+                  if (isStatus) {
+                    child = Text(
                       item,
                       overflow: TextOverflow.ellipsis,
-                      style: isStatus ? TextStyle(color: _getStatusColor(item), fontWeight: FontWeight.bold) : null,
-                    ),
-                  );
+                      style: TextStyle(
+                        color: _getStatusColor(item),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  } else if (isPriority) {
+                    child = Row(
+                      children: [
+                        Image.asset(
+                          _getPriorityIconPath(item),
+                          width: 16,
+                          height: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          item,
+                          style: TextStyle(
+                            color: _getPriorityColor(item),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    child = Text(item, overflow: TextOverflow.ellipsis);
+                  }
+
+                  return DropdownMenuItem<String>(value: item, child: child);
                 }).toList(),
                 onChanged: isResolved ? null : onChanged,
               ),
@@ -326,7 +522,12 @@ class DetailTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildTitledCard({required BuildContext context, required IconData icon, required String title, required Widget child}) {
+  Widget _buildTitledCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
     return Card(
       elevation: 1,
       shadowColor: Colors.black.withAlpha(26),
@@ -338,9 +539,19 @@ class DetailTabView extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: Theme.of(context).textTheme.bodyLarge?.color, size: 20),
+                Icon(
+                  icon,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             const Divider(height: 24),
@@ -353,13 +564,50 @@ class DetailTabView extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'New': return const Color(0xFFD32F2F);
-      case 'Waiting Reply': return const Color(0xFFE65100);
-      case 'Replied': return const Color(0xFF1976D2);
-      case 'In Progress': return const Color(0xFF673AB7);
-      case 'On Hold': return const Color(0xFFC2185B);
-      case 'Resolved': return const Color(0xFF388E3C);
-      default: return Colors.grey.shade700;
+      case 'New':
+        return const Color(0xFFD32F2F);
+      case 'Waiting Reply':
+        return const Color(0xFFE65100);
+      case 'Replied':
+        return const Color(0xFF1976D2);
+      case 'In Progress':
+        return const Color(0xFF673AB7);
+      case 'On Hold':
+        return const Color(0xFFC2185B);
+      case 'Resolved':
+        return const Color(0xFF388E3C);
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  String _getPriorityIconPath(String priority) {
+    switch (priority) {
+      case 'Critical':
+        return 'assets/images/label-critical.png';
+      case 'High':
+        return 'assets/images/label-high.png';
+      case 'Medium':
+        return 'assets/images/label-medium.png';
+      case 'Low':
+        return 'assets/images/label-low.png';
+      default:
+        return 'assets/images/label-medium.png';
+    }
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority) {
+      case 'Critical':
+        return Colors.red.shade700;
+      case 'High':
+        return Colors.orange.shade800;
+      case 'Medium':
+        return Colors.green.shade700;
+      case 'Low':
+        return Colors.blue.shade700;
+      default:
+        return Colors.grey.shade700;
     }
   }
 }

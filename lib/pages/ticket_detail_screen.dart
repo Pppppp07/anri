@@ -54,9 +54,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   late Duration _workedDuration;
 
   // --- OPTIONS LISTS ---
-  final List<String> _statusOptions = ['New', 'In Progress', 'Waiting Reply', 'Replied', 'On Hold', 'Resolved'];
+  final List<String> _statusOptions = [
+    'New',
+    'Waiting Reply',
+    'Replied',
+    'In Progress',
+    'On Hold',
+    'Resolved',
+  ];
   final List<String> _priorityOptions = ['Critical', 'High', 'Medium', 'Low'];
-  final List<String> _submitAsOptions = ['Replied', 'Waiting Reply', 'Resolved', 'In Progress', 'On Hold', 'New'];
+  final List<String> _submitAsOptions = [
+    'Replied',
+    'In Progress',
+    'On Hold',
+    'Waiting Reply',
+    'Resolved',
+    'New',
+  ];
 
   // --- LIFECYCLE METHODS ---
   @override
@@ -86,7 +100,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   }
 
   // --- LOGIC METHODS ---
-  
+
   Duration _parseDuration(String time) {
     final parts = time.split(':');
     if (parts.length == 3) {
@@ -125,7 +139,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           (route) => false,
         );
         if (message != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message), backgroundColor: Colors.red),
+          );
         }
       }
     });
@@ -138,9 +154,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       setState(() => _isLoadingDetails = false);
       return;
     }
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}');
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}',
+    );
     try {
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
       if (!mounted) return;
       if (response.statusCode == 401) {
         _logout(message: 'Sesi tidak valid.');
@@ -159,7 +179,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoadingDetails = false);
@@ -180,7 +202,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       'category_name': _selectedCategory,
       'owner_name': _assignedTo,
       'time_worked': _formatDuration(_workedDuration),
-      'due_date': _dueDate != null ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_dueDate!) : '',
+      'due_date': _dueDate != null
+          ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_dueDate!)
+          : '',
     };
     try {
       final response = await http.post(
@@ -192,7 +216,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       final data = json.decode(response.body);
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perubahan berhasil disimpan!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Perubahan berhasil disimpan!'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context, true);
       } else {
@@ -200,7 +227,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -210,7 +239,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   Future<void> _submitReply() async {
     if (_replyMessageController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pesan balasan tidak boleh kosong.'), backgroundColor: Colors.orange));
+        const SnackBar(
+          content: Text('Pesan balasan tidak boleh kosong.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
     setState(() => _isSubmittingReply = true);
@@ -235,20 +268,26 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       final data = json.decode(response.body);
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Balasan berhasil dikirim!'), backgroundColor: Colors.green));
+          const SnackBar(
+            content: Text('Balasan berhasil dikirim!'),
+            backgroundColor: Colors.green,
+          ),
+        );
         Navigator.pop(context, true);
       } else {
         throw Exception(data['message'] ?? 'Gagal mengirim balasan.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmittingReply = false);
     }
   }
-  
+
   void _toggleStopwatch() {
     setState(() {
       if (_isStopwatchRunning) {
@@ -265,7 +304,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       _isStopwatchRunning = !_isStopwatchRunning;
     });
   }
-  
+
   void _assignToMe() {
     if (_assignedTo == widget.currentUserName) return;
     setState(() => _assignedTo = widget.currentUserName);
@@ -279,7 +318,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     });
     _saveChanges();
   }
-  
+
   Future<void> _showDueDateEditor() async {
     final pickedDate = await showDatePicker(
       context: context,
@@ -317,12 +356,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       context: context,
       isScrollControlled: true,
       builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Edit Waktu Pengerjaan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Edit Waktu Pengerjaan',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             _buildTimeInput(controller: hoursController, label: 'Jam'),
             const SizedBox(height: 8),
@@ -332,7 +379,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Batal'))),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Batal'),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
@@ -341,7 +393,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                       final h = int.tryParse(hoursController.text) ?? 0;
                       final m = int.tryParse(minutesController.text) ?? 0;
                       final s = int.tryParse(secondsController.text) ?? 0;
-                      setState(() => _workedDuration = Duration(hours: h, minutes: m, seconds: s));
+                      setState(
+                        () => _workedDuration = Duration(
+                          hours: h,
+                          minutes: m,
+                          seconds: s,
+                        ),
+                      );
                       Navigator.pop(context);
                     },
                   ),
@@ -354,12 +412,21 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     );
   }
 
-  Widget _buildTimeInput({required TextEditingController controller, required String label}) {
+  Widget _buildTimeInput({
+    required TextEditingController controller,
+    required String label,
+  }) {
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(2),
+      ],
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 
@@ -376,7 +443,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                 Colors.white,
                 Color(0xFFE0F2F7),
                 Color(0xFFBBDEFB),
-                Colors.blueAccent
+                Colors.blueAccent,
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -387,7 +454,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 1,
-        title: Text(widget.ticket.subject, overflow: TextOverflow.ellipsis),
+        // DIUBAH: Ganti judul menjadi teks statis
+        title: const Text('Detail Tiket'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -417,10 +485,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               priorityOptions: _priorityOptions,
               categoryOptions: widget.allCategories,
               teamMemberOptions: widget.allTeamMembers,
-              onStatusChanged: (val) { if(val != null) setState(() => _selectedStatus = val); },
-              onPriorityChanged: (val) { if(val != null) setState(() => _selectedPriority = val); },
-              onCategoryChanged: (val) { if(val != null) setState(() => _selectedCategory = val); },
-              onOwnerChanged: (val) { if(val != null) setState(() => _assignedTo = val); },
+              onStatusChanged: (val) {
+                if (val != null) setState(() => _selectedStatus = val);
+              },
+              onPriorityChanged: (val) {
+                if (val != null) setState(() => _selectedPriority = val);
+              },
+              onCategoryChanged: (val) {
+                if (val != null) setState(() => _selectedCategory = val);
+              },
+              onOwnerChanged: (val) {
+                if (val != null) setState(() => _assignedTo = val);
+              },
               onSaveChanges: _saveChanges,
               onTapTimeWorked: _showTimeWorkedEditor,
               onTapDueDate: _showDueDateEditor,
@@ -441,7 +517,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   }
 
   // --- WIDGET BUILDERS UNTUK DI-PASS KE ANAK ---
-  
+
   Widget _buildTimeWorkedBar() {
     return InkWell(
       onTap: _isResolved ? null : _showTimeWorkedEditor,
@@ -449,29 +525,55 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+          color: Theme.of(
+            context,
+          ).colorScheme.primaryContainer.withOpacity(0.3),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withOpacity(0.5),
+          ),
         ),
         child: Row(
           children: [
-            Icon(Icons.timer_outlined, size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.timer_outlined,
+              size: 28,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Waktu Pengerjaan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Text(
+                  'Waktu Pengerjaan',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
                 const SizedBox(height: 2),
-                Text(_formatDuration(_workedDuration), style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+                Text(
+                  _formatDuration(_workedDuration),
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ],
             ),
             const Spacer(),
             IconButton(
-              icon: Icon(_isStopwatchRunning ? Icons.pause_circle_filled : Icons.play_circle_filled, size: 32),
+              icon: Icon(
+                _isStopwatchRunning
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_filled,
+                size: 32,
+              ),
               onPressed: _isResolved ? null : _toggleStopwatch,
               tooltip: _isStopwatchRunning ? 'Stop Timer' : 'Start Timer',
-              color: _isStopwatchRunning 
-                  ? Theme.of(context).colorScheme.error 
+              color: _isStopwatchRunning
+                  ? Theme.of(context).colorScheme.error
                   : Theme.of(context).colorScheme.primary,
             ),
           ],
@@ -489,7 +591,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             onPressed: _markAsResolved,
             icon: const Icon(Icons.check_circle_outline, size: 20),
             label: const Text('Tandai Selesai'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade600, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         if (!_isResolved && _assignedTo != widget.currentUserName)
           const SizedBox(height: 8),
@@ -498,19 +606,28 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             onPressed: _assignToMe,
             icon: const Icon(Icons.person_add_alt_1_outlined, size: 20),
             label: const Text('Tugaskan ke Saya'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
       ],
     );
   }
-  
+
   Widget _buildReplyForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextFormField(
           controller: _replyMessageController,
-          decoration: const InputDecoration(hintText: 'Ketik balasan Anda...', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            hintText: 'Ketik balasan Anda...',
+            border: OutlineInputBorder(),
+          ),
           maxLines: 6,
         ),
         const SizedBox(height: 16),
@@ -521,9 +638,28 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               flex: 2,
               child: DropdownButtonFormField<String>(
                 value: _submitAsAction,
-                items: _submitAsOptions.map((v) => DropdownMenuItem<String>(value: v, child: Text(v, overflow: TextOverflow.ellipsis, style: TextStyle(color: _getStatusColor(v), fontWeight: FontWeight.bold)))).toList(),
-                onChanged: (v) => setState(() { if (v != null) _submitAsAction = v; }),
-                decoration: const InputDecoration(labelText: 'Submit sebagai', border: OutlineInputBorder()),
+                items: _submitAsOptions
+                    .map(
+                      (v) => DropdownMenuItem<String>(
+                        value: v,
+                        child: Text(
+                          v,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _getStatusColor(v),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  if (v != null) _submitAsAction = v;
+                }),
+                decoration: const InputDecoration(
+                  labelText: 'Submit sebagai',
+                  border: OutlineInputBorder(),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -534,11 +670,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 elevation: 4,
-                textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
               ),
               child: _isSubmittingReply
-                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Text('Submit'),
             ),
           ],
@@ -549,13 +697,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'New': return const Color(0xFFD32F2F);
-      case 'Waiting Reply': return const Color(0xFFE65100);
-      case 'Replied': return const Color(0xFF1976D2);
-      case 'In Progress': return const Color(0xFF673AB7);
-      case 'On Hold': return const Color(0xFFC2185B);
-      case 'Resolved': return const Color(0xFF388E3C);
-      default: return Colors.grey.shade700;
+      case 'New':
+        return const Color(0xFFD32F2F);
+      case 'Waiting Reply':
+        return const Color(0xFFE65100);
+      case 'Replied':
+        return const Color(0xFF1976D2);
+      case 'In Progress':
+        return const Color(0xFF673AB7);
+      case 'On Hold':
+        return const Color(0xFFC2185B);
+      case 'Resolved':
+        return const Color(0xFF388E3C);
+      default:
+        return Colors.grey.shade700;
     }
   }
 }
