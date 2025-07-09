@@ -487,6 +487,10 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 children: _statusHeaderFilters.map((status) {
                   final isSelected = _selectedStatus == status;
+                  // BARU: Tambahkan pengecekan tema
+                  final isDarkMode =
+                      Theme.of(context).brightness == Brightness.dark;
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: ChoiceChip(
@@ -504,20 +508,44 @@ class _HomePageState extends State<HomePage> {
                       backgroundColor: Theme.of(
                         context,
                       ).colorScheme.surfaceContainerHighest,
+                      // DIUBAH: Logika style label dibuat kondisional
                       labelStyle: TextStyle(
                         color: isSelected
-                            ? Theme.of(context).colorScheme.onPrimaryContainer
+                            // Jika terpilih:
+                            ? isDarkMode
+                                  ? Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer // Gaya lama untuk tema gelap
+                                  : Theme.of(context)
+                                        .colorScheme
+                                        .primary // Gaya baru (biru) untuk tema terang
+                            // Jika tidak terpilih:
                             : Theme.of(context).textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.w500,
                       ),
+                      // DIUBAH: Logika garis pinggir dibuat kondisional
                       side: BorderSide(
                         color: isSelected
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer.withAlpha(150)
-                            : Theme.of(
-                                context,
-                              ).colorScheme.outline.withAlpha(50),
+                            // Jika terpilih:
+                            ? isDarkMode
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer.withAlpha(
+                                      150,
+                                    ) // Gaya lama untuk tema gelap
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(
+                                      0.5,
+                                    ) // Gaya baru (biru) untuk tema terang
+                            // Jika tidak terpilih:
+                            : isDarkMode
+                            ? Theme.of(context).colorScheme.outline.withAlpha(
+                                50,
+                              ) // Gaya lama untuk tema gelap
+                            : Colors
+                                  .grey
+                                  .shade300, // Gaya baru (abu-abu) untuk tema terang
                       ),
                     ),
                   );
@@ -680,36 +708,42 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildEmptyState() {
     bool isSearching = _searchController.text.isNotEmpty;
-    return Center(
+    return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // DIUBAH: Ukuran ikon diperkecil
             Icon(
               isSearching ? Icons.search_off : Icons.inbox_outlined,
-              size: 80,
+              size: 60,
               color: Colors.grey.shade400,
             ),
-            const SizedBox(height: 16),
+            // DIUBAH: Jarak vertikal dikurangi
+            const SizedBox(height: 12),
+            // DIUBAH: Ukuran font judul diperkecil
             Text(
               isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey.shade600,
               ),
             ),
-            const SizedBox(height: 8),
+            // DIUBAH: Jarak vertikal dikurangi
+            const SizedBox(height: 6),
+            // DIUBAH: Ukuran font sub-judul diperkecil
             Text(
               isSearching
                   ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".'
                   : 'Belum ada tiket yang cocok dengan filter yang aktif.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
             if (isSearching) ...[
-              const SizedBox(height: 24),
+              // DIUBAH: Jarak vertikal dikurangi
+              const SizedBox(height: 20),
               ElevatedButton.icon(
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Hapus Pencarian'),
