@@ -1,78 +1,18 @@
+// lib/home_page.dart
+
 import 'dart:async';
 import 'dart:convert';
+import 'package:anri/models/ticket_model.dart'; // DIUBAH
+import 'package:anri/pages/home/widgets/ticket_card.dart'; // BARU
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/pages/profile_page.dart';
-import 'package:anri/pages/ticket_detail_screen.dart';
-import 'package:flutter/foundation.dart';
+import 'package:anri/providers/ticket_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anri/config/api_config.dart';
+import 'package:http/http.dart' as http;
 
-class Ticket {
-  final int id;
-  final String trackid;
-  final String requesterName;
-  final String subject;
-  final String message;
-  final DateTime creationDate;
-  final DateTime lastChange;
-  final String statusText;
-  final String priorityText;
-  final String categoryName;
-  final String ownerName;
-  final String lastReplierText;
-  final int replies;
-  final String timeWorked;
-  final DateTime? dueDate;
-  final String custom1; // Untuk Unit Kerja
-  final String custom2; // Untuk No Ext/Hp
-
-  Ticket({
-    required this.id,
-    required this.trackid,
-    required this.requesterName,
-    required this.subject,
-    required this.message,
-    required this.creationDate,
-    required this.lastChange,
-    required this.statusText,
-    required this.priorityText,
-    required this.categoryName,
-    required this.ownerName,
-    required this.lastReplierText,
-    required this.replies,
-    required this.timeWorked,
-    this.dueDate,
-    required this.custom1,
-    required this.custom2,
-  });
-
-  factory Ticket.fromJson(Map<String, dynamic> json) {
-    return Ticket(
-      id: json['id'] as int,
-      trackid: json['trackid'] ?? 'N/A',
-      requesterName: json['requester_name'] ?? 'Unknown User',
-      subject: json['subject'] ?? 'No Subject',
-      message: json['message'] ?? '',
-      creationDate: DateTime.parse(json['creation_date']),
-      lastChange: DateTime.parse(json['lastchange']),
-      statusText: json['status_text'] ?? 'Unknown',
-      priorityText: json['priority_text'] ?? 'Unknown',
-      categoryName: json['category_name'] ?? 'Uncategorized',
-      ownerName: json['owner_name'] ?? 'Unassigned',
-      lastReplierText: json['last_replier_text'] ?? '-',
-      replies: json['replies'] as int? ?? 0,
-      timeWorked: json['time_worked'] ?? '00:00:00',
-      dueDate: json['due_date'] != null
-          ? DateTime.parse(json['due_date'])
-          : null,
-      custom1: json['custom1'] ?? '-',
-      custom2: json['custom2'] ?? '-',
-    );
-  }
-}
 
 class HomePage extends StatefulWidget {
   final String currentUserName;
@@ -88,8 +28,6 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-enum ListState { loading, error, empty, hasData }
-
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   String _selectedCategory = 'All';
@@ -98,90 +36,39 @@ class _HomePageState extends State<HomePage> {
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounce;
   Timer? _autoRefreshTimer;
-
-  final ValueNotifier<List<Ticket>> _ticketsNotifier = ValueNotifier([]);
-  final ValueNotifier<ListState> _listStateNotifier = ValueNotifier(
-    ListState.loading,
-  );
-  final ValueNotifier<bool> _isLoadingMoreNotifier = ValueNotifier(false);
-
-  int _currentPage = 1;
-  bool _hasMore = true;
-  String _searchQuery = '';
+  List<String> _teamMembers = ['Unassigned'];
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _headerFilterKey = GlobalKey();
   bool _isFabVisible = false;
-  List<String> _teamMembers = ['Unassigned'];
 
   final Map<String, String> _categories = {
     'All': 'Semua Kategori',
-    '1': 'Aplikasi Sistem Informasi',
-    '2': 'SRIKANDI',
-    '3': 'Layanan Kepegawaian',
-    '4': 'Perangkat Lunak',
-    '5': 'Perangkat Keras',
-    '6': 'Jaringan Komputer',
-    '7': 'Bangunan',
-    '8': 'Mesin dan AC',
-    '9': 'Listrik',
-    '10': 'Kendaraan Dinas',
-    '11': 'Pengembalian BMN',
-    '12': 'Insiden Siber',
-    '13': 'Pusat Data Nasional',
-    '14': 'CCTV',
-    '15': 'Email Dinas',
+    '1': 'Aplikasi Sistem Informasi', '2': 'SRIKANDI', '3': 'Layanan Kepegawaian',
+    '4': 'Perangkat Lunak', '5': 'Perangkat Keras', '6': 'Jaringan Komputer',
+    '7': 'Bangunan', '8': 'Mesin dan AC', '9': 'Listrik', '10': 'Kendaraan Dinas',
+    '11': 'Pengembalian BMN', '12': 'Insiden Siber', '13': 'Pusat Data Nasional',
+    '14': 'CCTV', '15': 'Email Dinas',
   };
 
-  final List<String> _statusHeaderFilters = [
-    'Semua Status',
-    'New',
-    'Waiting Reply',
-  ];
-  final List<String> _statusDialogFilters = [
-    'Semua Status',
-    'New',
-    'Waiting Reply',
-    'Replied',
-    'In Progress',
-    'On Hold',
-  ];
-
-  String get baseUrl {
-
-    return '${ApiConfig.baseUrl}';
-  }
+  final List<String> _statusHeaderFilters = ['Semua Status', 'New', 'Waiting Reply'];
+  final List<String> _statusDialogFilters = ['Semua Status', 'New', 'Waiting Reply', 'Replied', 'In Progress', 'On Hold'];
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
-
-    _searchController.addListener(() {
-      setState(() {});
-      if (_debounce?.isActive ?? false) _debounce!.cancel();
-      _debounce = Timer(const Duration(milliseconds: 500), () {
-        if (_searchQuery != _searchController.text) {
-          _triggerSearch();
-        }
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _triggerSearch();
+      _fetchTeamMembers();
     });
 
     _searchController.addListener(() {
-      if ((_searchController.text.isEmpty && _searchQuery.isNotEmpty) ||
-          (_searchController.text.isNotEmpty && _searchQuery.isEmpty)) {
-        setState(() {});
-      }
-
-      _searchQuery = _searchController.text;
-
       if (_debounce?.isActive ?? false) _debounce!.cancel();
-      _debounce = Timer(const Duration(milliseconds: 500), () {
-        _fetchInitialTickets();
-      });
+      _debounce = Timer(const Duration(milliseconds: 500), _triggerSearch);
     });
 
     _scrollController.addListener(() {
+
       if (_scrollController.hasClients) {
         final headerContext = _headerFilterKey.currentContext;
         if (headerContext != null) {
@@ -194,18 +81,8 @@ class _HomePageState extends State<HomePage> {
         }
       }
     });
+    
     _startAutoRefreshTimer();
-  }
-
-  Future<void> _fetchInitialData() async {
-    // Panggil satu per satu. Jika _fetchTeamMembers gagal karena auth,
-    // _fetchTickets tidak akan pernah dipanggil.
-    await _fetchTeamMembers();
-
-    // Pastikan widget masih ada di tree sebelum melanjutkan
-    if (!mounted) return;
-
-    await _fetchTickets(page: 1);
   }
 
   @override
@@ -215,12 +92,27 @@ class _HomePageState extends State<HomePage> {
     _searchFocusNode.dispose();
     _autoRefreshTimer?.cancel();
     _debounce?.cancel();
-    _ticketsNotifier.dispose();
-    _listStateNotifier.dispose();
-    _isLoadingMoreNotifier.dispose();
     super.dispose();
   }
+  
+  void _triggerSearch() {
+    context.read<TicketProvider>().fetchTickets(
+          status: _getStatusForAPI(),
+          category: _selectedCategory,
+          searchQuery: _searchController.text,
+          isRefresh: true,
+        );
+  }
 
+  String _getStatusForAPI() {
+    if (_selectedIndex == 1) return 'Resolved';
+    if (_selectedStatus == 'Semua Status') return 'All';
+    return _selectedStatus;
+  }
+  
+  // Method _fetchTeamMembers, _logout, _startAutoRefreshTimer tetap di sini karena
+  // merupakan bagian dari logic halaman, bukan state tiket.
+  // ... (Salin method _fetchTeamMembers, _logout, dan _startAutoRefreshTimer ke sini)
   Future<Map<String, String>> _getAuthHeaders() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('auth_token');
@@ -232,26 +124,12 @@ class _HomePageState extends State<HomePage> {
     }
     return {'Authorization': 'Bearer $token'};
   }
-
-  void _startAutoRefreshTimer() {
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      if (_currentPage == 1 &&
-          _selectedIndex != 2 &&
-          _searchController.text.isEmpty &&
-          mounted &&
-          _listStateNotifier.value != ListState.loading &&
-          !_isLoadingMoreNotifier.value) {
-        _silentRefreshTickets();
-      }
-    });
-  }
-
+  
   Future<void> _fetchTeamMembers() async {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty && mounted) return;
     try {
-      final url = Uri.parse('$baseUrl/get_users.php');
+      final url = Uri.parse('${ApiConfig.baseUrl}/get_users.php');
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
@@ -277,84 +155,6 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint("Gagal mengambil daftar tim: $e");
-      // Anda bisa menambahkan pesan error di UI jika diperlukan
-      // setState(() => _error = 'Gagal memuat daftar tim.');
-    }
-  }
-
-  void _triggerSearch() {
-    _fetchInitialTickets();
-  }
-
-  Future<void> _fetchInitialTickets() async {
-    _listStateNotifier.value = ListState.loading;
-    _currentPage = 1;
-    _hasMore = true;
-    await _fetchTickets(page: 1);
-  }
-
-  Future<void> _loadMoreTickets() async {
-    if (_isLoadingMoreNotifier.value || !_hasMore) return;
-    _isLoadingMoreNotifier.value = true;
-    _currentPage++;
-    await _fetchTickets(page: _currentPage);
-    _isLoadingMoreNotifier.value = false;
-  }
-
-  Future<void> _fetchTickets({required int page}) async {
-    final headers = await _getAuthHeaders();
-    if (headers.isEmpty) return;
-
-    String statusForAPI = _selectedStatus;
-    if (_selectedIndex == 1) {
-      statusForAPI = 'Resolved';
-    } else if (_selectedStatus == 'Semua Status') {
-      statusForAPI = 'All';
-    }
-
-    final url = Uri.parse(
-      '$baseUrl/get_tickets.php?status=$statusForAPI&category=$_selectedCategory&page=$page&search=${_searchController.text}',
-    );
-
-    try {
-      final response = await http
-          .get(url, headers: headers)
-          .timeout(const Duration(seconds: 20));
-
-      if (response.statusCode == 401 && mounted) {
-        _logout(context, message: 'Sesi tidak valid. Silakan login kembali.');
-        return;
-      }
-      if (response.statusCode == 200 && mounted) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          final newTickets = (data['data'] as List)
-              .map((json) => Ticket.fromJson(json))
-              .toList();
-
-          if (page == 1) {
-            _ticketsNotifier.value = newTickets;
-          } else {
-            _ticketsNotifier.value = [..._ticketsNotifier.value, ...newTickets];
-          }
-
-          _hasMore = newTickets.length >= 10;
-
-          if (_ticketsNotifier.value.isEmpty) {
-            _listStateNotifier.value = ListState.empty;
-          } else {
-            _listStateNotifier.value = ListState.hasData;
-          }
-        } else {
-          throw Exception(data['message'] ?? 'Gagal memuat data');
-        }
-      } else {
-        throw Exception(
-          'Gagal terhubung ke server (Kode: ${response.statusCode})',
-        );
-      }
-    } catch (e) {
-      _listStateNotifier.value = ListState.error;
     }
   }
 
@@ -378,71 +178,32 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Color _getStatusColor(String status) {
-    if (status == 'Semua Status') {
-      return Colors.black87;
-    }
-    switch (status) {
-      case 'New':
-        return const Color(0xFFD32F2F);
-      case 'Waiting Reply':
-        return const Color(0xFFE65100);
-      case 'Replied':
-        return const Color(0xFF1976D2);
-      case 'In Progress':
-        return const Color(0xFF673AB7);
-      case 'On Hold':
-        return const Color(0xFFC2185B);
-      case 'Resolved':
-        return const Color(0xFF388E3C);
-      default:
-        return Colors.grey.shade700;
-    }
+  void _startAutoRefreshTimer() {
+    _autoRefreshTimer?.cancel();
+    final ticketProvider = context.read<TicketProvider>();
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (_selectedIndex != 2 &&
+          _searchController.text.isEmpty &&
+          mounted &&
+          ticketProvider.listState != ListState.loading &&
+          !ticketProvider.isLoadingMore) {
+        // Silent refresh
+        ticketProvider.fetchTickets(
+          status: _getStatusForAPI(),
+          category: _selectedCategory,
+          searchQuery: _searchController.text,
+          isRefresh: true,
+        );
+      }
+    });
   }
-
-  String _getPriorityIconPath(String priority) {
-    switch (priority) {
-      case 'Critical':
-        return 'assets/images/label-critical.png';
-      case 'High':
-        return 'assets/images/label-high.png';
-      case 'Medium':
-        return 'assets/images/label-medium.png';
-      case 'Low':
-        return 'assets/images/label-low.png';
-      default:
-        return 'assets/images/label-medium.png';
-    }
-  }
-
-  Color _getPriorityColor(String priority) {
-    switch (priority) {
-      case 'Critical':
-        return Colors.red.shade700;
-      case 'High':
-        return Colors.orange.shade800;
-      case 'Medium':
-        return Colors.green.shade700;
-      case 'Low':
-        return Colors.blue.shade700;
-      default:
-        return Colors.grey.shade700;
-    }
-  }
-
+  
   @override
   Widget build(BuildContext context) {
     const pageBackgroundDecoration = BoxDecoration(
       gradient: LinearGradient(
-        colors: [
-          Colors.white,
-          Color(0xFFE0F2F7),
-          Color(0xFFBBDEFB),
-          Colors.blueAccent,
-        ],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        stops: [0.0, 0.4, 0.7, 1.0],
+        colors: [ Colors.white, Color(0xFFE0F2F7), Color(0xFFBBDEFB), Colors.blueAccent ],
+        begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: [0.0, 0.4, 0.7, 1.0],
       ),
     );
 
@@ -456,13 +217,7 @@ class _HomePageState extends State<HomePage> {
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 16.0),
-                    child: Text(
-                      'Hi, ${widget.currentUserName}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
+                    child: Text('Hi, ${widget.currentUserName}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
                   ),
                 ),
               ]
@@ -490,72 +245,20 @@ class _HomePageState extends State<HomePage> {
         onTap: (index) {
           if (_selectedIndex != index) {
             _searchController.clear();
-            _searchQuery = '';
-            _selectedCategory = 'All';
-            _selectedStatus = 'New';
-            setState(() => _selectedIndex = index);
-            if (index != 2) {
-              _fetchInitialTickets();
-            }
+            setState(() { _selectedIndex = index; _selectedCategory = 'All'; _selectedStatus = 'New'; });
+            if (index != 2) _triggerSearch();
           }
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Beranda',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history),
-            label: 'Riwayat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profil',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Beranda'),
+          BottomNavigationBarItem(icon: Icon(Icons.history_outlined), activeIcon: Icon(Icons.history), label: 'Riwayat'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
         ],
       ),
     );
   }
-
-  Widget _buildAppBarTitle() {
-    switch (_selectedIndex) {
-      case 0:
-      case 1:
-        return Row(
-          children: [
-            Image.asset(
-              'assets/images/anri_logo.png',
-              height: 36,
-              filterQuality: FilterQuality.high,
-            ),
-            const SizedBox(width: 12),
-            ShaderMask(
-              blendMode: BlendMode.srcIn,
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [
-                  Color(0xFF0D47A1), // Biru tua
-                  Color(0xFF1976D2), // Biru
-                  Color(0xFF42A5F5), // Biru muda
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
-              child: const Text(
-                'Help Desk',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      case 2:
-        return const SizedBox.shrink();
-      default:
-        return const Text('Help Desk');
-    }
-  }
+  
+  // Di dalam file lib/home_page.dart
 
   Widget _buildBody() {
     switch (_selectedIndex) {
@@ -569,20 +272,66 @@ class _HomePageState extends State<HomePage> {
             children: [
               _buildHeaderFilterBar(),
               Expanded(
-                child: ValueListenableBuilder<ListState>(
-                  valueListenable: _listStateNotifier,
-                  builder: (context, state, child) {
-                    switch (state) {
+                child: Consumer<TicketProvider>(
+                  builder: (context, provider, child) {
+                    switch (provider.listState) {
                       case ListState.loading:
                         return const Center(child: CircularProgressIndicator());
                       case ListState.error:
-                        return _buildErrorState(
-                          'Tidak dapat terhubung. Periksa koneksi Anda.',
-                        );
+                        return _buildErrorState(provider.errorMessage);
                       case ListState.empty:
                         return _buildEmptyState();
                       case ListState.hasData:
-                        return _buildTicketList();
+                        return RefreshIndicator(
+                          onRefresh: () async => _triggerSearch(),
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.fromLTRB(0, 0, 0, 80),
+                            // DIUBAH: Tambah 1 item jika 'hasMore' true untuk tombol/spinner
+                            itemCount: provider.tickets.length + (provider.hasMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              // BARU: Logika untuk menampilkan tombol atau spinner
+                              if (index == provider.tickets.length && provider.hasMore) {
+                                // Jika ini adalah item terakhir & masih ada data
+                                return provider.isLoadingMore
+                                  ? const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                                      child: Center(child: CircularProgressIndicator()),
+                                    )
+                                  : Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                      child: Center(
+                                        child: FilledButton.icon(
+                                          onPressed: () {
+                                            context.read<TicketProvider>().loadMoreTickets(
+                                              status: _getStatusForAPI(),
+                                              category: _selectedCategory,
+                                              searchQuery: _searchController.text,
+                                            );
+                                          },
+                                          icon: const Icon(Icons.add_circle_outline),
+                                          label: const Text('Tampilkan Lebih Banyak'),
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            foregroundColor: Theme.of(context).primaryColor,
+                                            elevation: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                              }
+                              
+                              // Menampilkan kartu tiket seperti biasa
+                              final ticket = provider.tickets[index];
+                              return TicketCard(
+                                ticket: ticket,
+                                allCategories: _categories.entries.where((e) => e.key != 'All').map((e) => e.value).toList(),
+                                allTeamMembers: _teamMembers,
+                                currentUserName: widget.currentUserName,
+                              );
+                            },
+                          ),
+                        );
                     }
                   },
                 ),
@@ -597,8 +346,36 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // SEMUA method _buildTicketList, _buildTicketCard, dan _buildPaginationControl
+  // TELAH DIHAPUS DARI SINI dan dipindahkan ke widgetnya masing-masing.
+
+  // Sisa method build UI (seperti _buildAppBarTitle, _buildHeaderFilterBar) tetap sama.
+  // ... (salin method _buildAppBarTitle, _buildHeaderFilterBar, _showFilterDialog, _buildEmptyState, _buildErrorState) ...
+  Widget _buildAppBarTitle() {
+    switch (_selectedIndex) {
+      case 0:
+      case 1:
+        return Row(
+          children: [
+            Image.asset('assets/images/anri_logo.png', height: 36, filterQuality: FilterQuality.high),
+            const SizedBox(width: 12),
+            ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Color(0xFF0D47A1), Color(0xFF1976D2), Color(0xFF42A5F5)],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+              ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+              child: const Text('Help Desk', style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      case 2: return const SizedBox.shrink();
+      default: return const Text('Help Desk');
+    }
+  }
+
   Widget _buildHeaderFilterBar() {
-    return Container(
+     return Container(
       key: _headerFilterKey,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
@@ -614,17 +391,9 @@ class _HomePageState extends State<HomePage> {
                     hintText: 'Cari tiket...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                            },
-                          )
+                        ? IconButton(icon: const Icon(Icons.clear, size: 20), onPressed: () => _searchController.clear())
                         : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     fillColor: Colors.white.withOpacity(0.8),
                     filled: true,
                     contentPadding: const EdgeInsets.only(left: 15),
@@ -634,11 +403,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: Icon(
-                  Icons.filter_list_alt,
-                  color: Theme.of(context).primaryColor,
-                  size: 28,
-                ),
+                icon: Icon(Icons.filter_list_alt, color: Theme.of(context).primaryColor, size: 28),
                 onPressed: _showFilterDialog,
                 tooltip: 'Filter Lanjutan',
               ),
@@ -646,13 +411,7 @@ class _HomePageState extends State<HomePage> {
           ),
           if (_selectedIndex == 0) ...[
             const SizedBox(height: 16),
-            Text(
-              'Status',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Status', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -670,21 +429,10 @@ class _HomePageState extends State<HomePage> {
                           _triggerSearch();
                         }
                       },
-                      selectedColor: Theme.of(
-                        context,
-                      ).primaryColor.withOpacity(0.15),
+                      selectedColor: Theme.of(context).primaryColor.withOpacity(0.15),
                       backgroundColor: Colors.white.withOpacity(0.7),
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? Theme.of(context).primaryColor
-                            : Colors.black54,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      side: BorderSide(
-                        color: isSelected
-                            ? Theme.of(context).primaryColor
-                            : Colors.grey.shade300,
-                      ),
+                      labelStyle: TextStyle(color: isSelected ? Theme.of(context).primaryColor : Colors.black54, fontWeight: FontWeight.w500),
+                      side: BorderSide(color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade300),
                     ),
                   );
                 }).toList(),
@@ -698,7 +446,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showFilterDialog() {
-    String tempCategory = _selectedCategory;
+    // Implementasi dialog tidak berubah
+     String tempCategory = _selectedCategory;
     String tempStatus = _selectedStatus;
 
     showDialog(
@@ -728,15 +477,7 @@ class _HomePageState extends State<HomePage> {
                     items: _statusDialogFilters.map((status) {
                       return DropdownMenuItem<String>(
                         value: status,
-                        child: Text(
-                          status,
-                          style: TextStyle(
-                            color: _getStatusColor(status),
-                            fontWeight: status == 'Semua Status'
-                                ? FontWeight.normal
-                                : FontWeight.bold,
-                          ),
-                        ),
+                        child: Text(status),
                       );
                     }).toList(),
                     onChanged: (newValue) {
@@ -775,14 +516,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              // ================= PERUBAHAN DI SINI =================
               actions: [
-                // Menggunakan Column untuk layout vertikal yang responsif
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    // Tombol Terapkan
                     FilledButton(
                       onPressed: () {
                         Navigator.of(context).pop();
@@ -795,8 +533,7 @@ class _HomePageState extends State<HomePage> {
                       style: FilledButton.styleFrom(shape: buttonShape),
                       child: const Text('Terapkan'),
                     ),
-                    const SizedBox(height: 8), // Jarak antar tombol
-                    // Tombol Atur Ulang
+                    const SizedBox(height: 8), 
                     OutlinedButton(
                       onPressed: () {
                         setDialogState(() {
@@ -810,7 +547,6 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ],
-              // ================= AKHIR PERUBAHAN =================
             );
           },
         );
@@ -818,328 +554,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTicketList() {
-    return RefreshIndicator(
-      onRefresh: _fetchInitialTickets,
-      child: ValueListenableBuilder<List<Ticket>>(
-        valueListenable: _ticketsNotifier,
-        builder: (context, tickets, child) {
-          return ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 80),
-            itemCount: tickets.length + 1,
-            itemBuilder: (context, index) {
-              if (index < tickets.length) {
-                return _buildTicketCard(tickets[index]);
-              } else {
-                return _buildPaginationControl();
-              }
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildTicketCard(Ticket ticket) {
-    final DateFormat formatter = DateFormat('d MMM yy, HH:mm', 'id_ID');
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.05),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () async {
-          final categoryNames = _categories.entries
-              .where((entry) => entry.key != 'All')
-              .map((entry) => entry.value)
-              .toList();
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TicketDetailScreen(
-                ticket: ticket,
-                allCategories: categoryNames,
-                allTeamMembers: _teamMembers,
-                currentUserName: widget.currentUserName,
-              ),
-            ),
-          );
-          if (result == true) {
-            _fetchInitialTickets();
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '#${ticket.trackid}',
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(ticket.statusText),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          ticket.statusText.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getPriorityColor(
-                            ticket.priorityText,
-                          ).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Image.asset(
-                              _getPriorityIconPath(ticket.priorityText),
-                              height: 12,
-                              width: 12,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              ticket.priorityText,
-                              style: TextStyle(
-                                color: _getPriorityColor(ticket.priorityText),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                ticket.subject,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.black87,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 10),
-
-              // Baris untuk Requester/Nama
-              Row(
-                children: [
-                  Icon(
-                    Icons.person_outline,
-                    size: 16,
-                    color: Colors.grey.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      ticket.requesterName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color.fromARGB(255, 0, 0, 0),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Baris untuk Kategori (dengan Ikon baru)
-              Row(
-                children: [
-                  Icon(
-                    Icons.category_outlined, // Ikon baru untuk Kategori
-                    size: 16,
-                    color: Colors.grey.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      ticket.categoryName, // Menampilkan nama kategori saja
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color.fromARGB(255, 0, 0, 0),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Baris untuk Unit Kerja (kembali menggunakan Ikon)
-              Row(
-                children: [
-                  Icon(
-                    Icons.business, // Ikon gedung untuk Unit Kerja
-                    size: 16,
-                    color: Colors.grey.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      ticket.custom1, // Data Unit Kerja
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color.fromARGB(255, 0, 0, 0),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-
-              Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  title: const Text(
-                    'Lihat Detail Lainnya...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
-                  children: [
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    _buildDetailRow('Ditugaskan ke', ticket.ownerName),
-                    const SizedBox(height: 6),
-                    _buildDetailRow('Balasan Terakhir', ticket.lastReplierText),
-                    const SizedBox(height: 6),
-                    _buildDetailRow(
-                      'Update Terakhir',
-                      formatter.format(ticket.lastChange),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 112,
-          child: Text(
-            '$label:',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPaginationControl() {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _isLoadingMoreNotifier,
-      builder: (context, isLoadingMore, child) {
-        if (isLoadingMore) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16.0),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (_hasMore) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Center(
-              child: FilledButton.icon(
-                onPressed: _loadMoreTickets,
-                icon: const Icon(Icons.add_circle_outline),
-                label: const Text('Tampilkan Lebih Banyak'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Theme.of(context).primaryColor,
-                  elevation: 2,
-                ),
-              ),
-            ),
-          );
-        }
-        return const SizedBox.shrink();
-      },
-    );
-  }
-
-  Widget _buildEmptyState() {
-    bool isSearching = _searchController.text.isNotEmpty;
+   Widget _buildEmptyState() {
+     // Implementasi tidak berubah
+      bool isSearching = _searchController.text.isNotEmpty;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isSearching ? Icons.search_off : Icons.inbox_outlined,
-              size: 80,
-              color: Colors.grey.shade400,
-            ),
+            Icon(isSearching ? Icons.search_off : Icons.inbox_outlined, size: 80, color: Colors.grey.shade400),
             const SizedBox(height: 16),
-            Text(
-              isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
-              ),
-            ),
+            Text(isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
             const SizedBox(height: 8),
             Text(
               isSearching
-                  ? 'Tidak ada tiket yang cocok dengan pencarian "$_searchQuery".'
+                  ? 'Tidak ada tiket yang cocok dengan pencarian "$_searchController".'
                   : 'Belum ada tiket yang cocok dengan filter yang aktif.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
@@ -1149,24 +579,18 @@ class _HomePageState extends State<HomePage> {
               ElevatedButton.icon(
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Hapus Pencarian'),
-                onPressed: () {
-                  _searchController.clear();
-                },
+                onPressed: () => _searchController.clear(),
               ),
             ],
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _silentRefreshTickets() async {
-    if (_isLoadingMoreNotifier.value) return;
-    await _fetchTickets(page: 1);
-  }
+   }
 
   Widget _buildErrorState(String error) {
-    return Center(
+    // Implementasi tidak berubah
+      return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
@@ -1174,19 +598,12 @@ class _HomePageState extends State<HomePage> {
           children: [
             Icon(Icons.wifi_off_outlined, size: 80, color: Colors.red.shade300),
             const SizedBox(height: 16),
-            const Text(
-              'Oops, Terjadi Kesalahan',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
+            const Text('Oops, Terjadi Kesalahan', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-            ),
+            Text(error, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _fetchInitialTickets,
+              onPressed: _triggerSearch,
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
             ),
