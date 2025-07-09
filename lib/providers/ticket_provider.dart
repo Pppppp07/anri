@@ -37,19 +37,24 @@ class TicketProvider with ChangeNotifier {
     return {'Authorization': 'Bearer $token'};
   }
 
-  Future<void> fetchTickets({
+   Future<void> fetchTickets({
     required String status,
     required String category,
     required String searchQuery,
     bool isRefresh = false,
+    bool isBackgroundRefresh = false, // BARU: Tambahkan parameter ini
   }) async {
     if (isRefresh) {
       _currentPage = 1;
       _hasMore = true;
-      _tickets = [];
+      // HANYA kosongkan tiket jika ini BUKAN refresh latar belakang
+      if (!isBackgroundRefresh) {
+        _tickets = [];
+      }
     }
     
-    if (!_isLoadingMore) {
+    // HANYA tampilkan loading jika ini BUKAN refresh latar belakang
+    if (!_isLoadingMore && !isBackgroundRefresh) {
       _listState = ListState.loading;
       notifyListeners();
     }

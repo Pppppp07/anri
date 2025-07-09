@@ -366,6 +366,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   // --- MAIN BUILD METHOD ---
   @override
   Widget build(BuildContext context) {
+    // BARU: Logika untuk menentukan tema dan dekorasi background
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBackgroundDecoration = BoxDecoration(
+      gradient: isDarkMode
+          ? null // Tidak ada gradien untuk mode gelap
+          : const LinearGradient(
+              colors: [
+                Colors.white,
+                Color(0xFFE0F2F7),
+                Color(0xFFBBDEFB),
+                Colors.blueAccent
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+    );
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -379,41 +396,46 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          DetailTabView(
-            ticket: widget.ticket,
-            isResolved: _isResolved,
-            isSaving: _isSaving,
-            workedDuration: _workedDuration,
-            dueDate: _dueDate,
-            selectedStatus: _selectedStatus,
-            selectedPriority: _selectedPriority,
-            selectedCategory: _selectedCategory,
-            assignedTo: _assignedTo,
-            statusOptions: _statusOptions,
-            priorityOptions: _priorityOptions,
-            categoryOptions: widget.allCategories,
-            teamMemberOptions: widget.allTeamMembers,
-            onStatusChanged: (val) { if(val != null) setState(() => _selectedStatus = val); },
-            onPriorityChanged: (val) { if(val != null) setState(() => _selectedPriority = val); },
-            onCategoryChanged: (val) { if(val != null) setState(() => _selectedCategory = val); },
-            onOwnerChanged: (val) { if(val != null) setState(() => _assignedTo = val); },
-            onSaveChanges: _saveChanges,
-            onTapTimeWorked: _showTimeWorkedEditor,
-            onTapDueDate: _showDueDateEditor,
-            onClearDueDate: () => setState(() => _dueDate = null),
-            timeWorkedBar: _buildTimeWorkedBar(),
-            actionShortcuts: _buildActionShortcuts(),
-          ),
-          ReplyHistoryTabView(
-            isLoadingDetails: _isLoadingDetails,
-            replies: _replies,
-            isResolved: _isResolved,
-            replyForm: _buildReplyForm(),
-          ),
-        ],
+      // DIUBAH: Bungkus TabBarView dengan Container
+      body: Container(
+        // BARU: Terapkan dekorasi di sini
+        decoration: pageBackgroundDecoration,
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            DetailTabView(
+              ticket: widget.ticket,
+              isResolved: _isResolved,
+              isSaving: _isSaving,
+              workedDuration: _workedDuration,
+              dueDate: _dueDate,
+              selectedStatus: _selectedStatus,
+              selectedPriority: _selectedPriority,
+              selectedCategory: _selectedCategory,
+              assignedTo: _assignedTo,
+              statusOptions: _statusOptions,
+              priorityOptions: _priorityOptions,
+              categoryOptions: widget.allCategories,
+              teamMemberOptions: widget.allTeamMembers,
+              onStatusChanged: (val) { if(val != null) setState(() => _selectedStatus = val); },
+              onPriorityChanged: (val) { if(val != null) setState(() => _selectedPriority = val); },
+              onCategoryChanged: (val) { if(val != null) setState(() => _selectedCategory = val); },
+              onOwnerChanged: (val) { if(val != null) setState(() => _assignedTo = val); },
+              onSaveChanges: _saveChanges,
+              onTapTimeWorked: _showTimeWorkedEditor,
+              onTapDueDate: _showDueDateEditor,
+              onClearDueDate: () => setState(() => _dueDate = null),
+              timeWorkedBar: _buildTimeWorkedBar(),
+              actionShortcuts: _buildActionShortcuts(),
+            ),
+            ReplyHistoryTabView(
+              isLoadingDetails: _isLoadingDetails,
+              replies: _replies,
+              isResolved: _isResolved,
+              replyForm: _buildReplyForm(),
+            ),
+          ],
+        ),
       ),
     );
   }
