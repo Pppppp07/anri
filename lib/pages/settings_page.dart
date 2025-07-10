@@ -76,7 +76,6 @@ class _SettingsPageState extends State<SettingsPage> {
             value: _notificationsEnabled,
             onChanged: (bool value) {
               setState(() => _notificationsEnabled = value);
-              // TODO: Implementasi logika Notifikasi (mungkin memanggil fungsi di provider notifikasi)
             },
             secondary: const Icon(Icons.notifications_active_outlined),
           ),
