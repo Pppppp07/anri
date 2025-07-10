@@ -36,7 +36,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // --- STATE VARIABLES ---
   late String _selectedStatus;
   late String _selectedPriority;
   late String _selectedCategory;
@@ -53,7 +52,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   bool _isStopwatchRunning = false;
   late Duration _workedDuration;
 
-  // --- OPTIONS LISTS ---
   final List<String> _statusOptions = [
     'New',
     'Waiting Reply',
@@ -72,7 +70,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     'New',
   ];
 
-  // --- LIFECYCLE METHODS ---
   @override
   void initState() {
     super.initState();
@@ -98,8 +95,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     _stopwatchTimer?.cancel();
     super.dispose();
   }
-
-  // --- LOGIC METHODS ---
 
   Duration _parseDuration(String time) {
     final parts = time.split(':');
@@ -130,21 +125,27 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Future<void> _logout({String? message}) async {
     if (!mounted) return;
-    final prefs = await SharedPreferences.getInstance();
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool rememberMe = prefs.getBool('rememberMe') ?? false;
+    final String? username = prefs.getString('user_username');
+
     await prefs.clear();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (route) => false,
-        );
-        if (message != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message), backgroundColor: Colors.red),
-          );
-        }
-      }
-    });
+
+    if (rememberMe && username != null) {
+      await prefs.setBool('rememberMe', true);
+      await prefs.setString('user_username', username);
+    }
+    
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
+    if (message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _fetchTicketDetails() async {
@@ -260,7 +261,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           'ticket_id': widget.ticket.id.toString(),
           'message': _replyMessageController.text,
           'new_status': _submitAsAction,
-          'staff_id': '1',
+          'staff_id': '1', // Ganti dengan ID user yang login jika perlu
           'staff_name': widget.currentUserName,
         },
       );
@@ -430,14 +431,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     );
   }
 
-  // --- MAIN BUILD METHOD ---
   @override
   Widget build(BuildContext context) {
-    // BARU: Logika untuk menentukan tema dan dekorasi background
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final pageBackgroundDecoration = BoxDecoration(
       gradient: isDarkMode
-          ? null // Tidak ada gradien untuk mode gelap
+          ? null
           : const LinearGradient(
               colors: [
                 Colors.white,
@@ -450,11 +449,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             ),
     );
 
+    final List<String> currentTeamMemberOptions =
+        List.from(widget.allTeamMembers);
+    if (!currentTeamMemberOptions.contains(_assignedTo)) {
+      currentTeamMemberOptions.add(_assignedTo);
+    }
+    
+    final List<String> currentCategoryOptions =
+        List.from(widget.allCategories);
+    if (!currentCategoryOptions.contains(_selectedCategory)) {
+      currentCategoryOptions.add(_selectedCategory);
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 1,
-        // DIUBAH: Ganti judul menjadi teks statis
         title: const Text('Detail Tiket'),
         bottom: TabBar(
           controller: _tabController,
@@ -464,9 +474,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           ],
         ),
       ),
-      // DIUBAH: Bungkus TabBarView dengan Container
       body: Container(
-        // BARU: Terapkan dekorasi di sini
         decoration: pageBackgroundDecoration,
         child: TabBarView(
           controller: _tabController,
@@ -483,8 +491,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               assignedTo: _assignedTo,
               statusOptions: _statusOptions,
               priorityOptions: _priorityOptions,
-              categoryOptions: widget.allCategories,
-              teamMemberOptions: widget.allTeamMembers,
+              categoryOptions: currentCategoryOptions,
+              teamMemberOptions: currentTeamMemberOptions,
               onStatusChanged: (val) {
                 if (val != null) setState(() => _selectedStatus = val);
               },
@@ -507,6 +515,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             ReplyHistoryTabView(
               isLoadingDetails: _isLoadingDetails,
               replies: _replies,
+              // --- PERBAIKAN 1: undefined_identifier 'isResolved' ---
               isResolved: _isResolved,
               replyForm: _buildReplyForm(),
             ),
@@ -516,8 +525,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     );
   }
 
-  // --- WIDGET BUILDERS UNTUK DI-PASS KE ANAK ---
-
   Widget _buildTimeWorkedBar() {
     return InkWell(
       onTap: _isResolved ? null : _showTimeWorkedEditor,
@@ -525,14 +532,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Theme.of(
-            context,
-          ).colorScheme.primaryContainer.withOpacity(0.3),
+          // --- PERBAIKAN 2: deprecated_member_use ---
+          color: Theme.of(context).colorScheme.primaryContainer.withAlpha(77),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.primaryContainer.withOpacity(0.5),
+            // --- PERBAIKAN 3: deprecated_member_use ---
+            color: Theme.of(context).colorScheme.primaryContainer.withAlpha(128),
           ),
         ),
         child: Row(

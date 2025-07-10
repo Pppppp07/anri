@@ -2,17 +2,19 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:anri/config/api_config.dart';
 import 'package:anri/models/ticket_model.dart';
+import 'package:anri/pages/error_page.dart';
 import 'package:anri/pages/home/widgets/ticket_card.dart';
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/pages/profile_page.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
+import 'package:anri/utils/error_handler.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anri/config/api_config.dart';
-import 'package:http/http.dart' as http;
 
 class HomePage extends StatefulWidget {
   final String currentUserName;
@@ -81,7 +83,6 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _triggerSearch();
       _fetchTeamMembers();
-      // Panggil timer saat pertama kali halaman dibuat
       _startAutoRefreshTimer();
     });
 
@@ -115,13 +116,14 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void _triggerSearch() {
-    context.read<TicketProvider>().fetchTickets(
-      status: _getStatusForAPI(),
-      category: _selectedCategory,
-      searchQuery: _searchController.text,
-      isRefresh: true,
-    );
+  Future<void> _triggerSearch() async {
+    if (!mounted) return;
+    await context.read<TicketProvider>().fetchTickets(
+          status: _getStatusForAPI(),
+          category: _selectedCategory,
+          searchQuery: _searchController.text,
+          isRefresh: true,
+        );
   }
 
   String _getStatusForAPI() {
@@ -144,28 +146,26 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchTeamMembers() async {
     final headers = await _getAuthHeaders();
-    if (headers.isEmpty && mounted) return;
+    if (headers.isEmpty || !mounted) return;
     try {
       final url = Uri.parse('${ApiConfig.baseUrl}/get_users.php');
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
+      if (!mounted) return;
       if (response.statusCode == 401) {
-        if (mounted) _logout(context, message: 'Sesi tidak valid.');
+        _logout(context, message: 'Sesi tidak valid.');
         return;
       }
-      if (response.statusCode == 200 && mounted) {
+      if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
           final List<dynamic> data = responseData['data'];
-          final List<String> fetchedMembers = data
-              .map((user) => user['name'].toString())
-              .toList();
-
+          final List<String> fetchedMembers =
+              data.map((user) => user['name'].toString()).toList();
           setState(() {
-            _teamMembers = fetchedMembers.isNotEmpty
-                ? fetchedMembers
-                : ['Unassigned'];
+            _teamMembers =
+                fetchedMembers.isNotEmpty ? fetchedMembers : ['Unassigned'];
           });
         }
       }
@@ -174,33 +174,41 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // --- PERBAIKAN: use_build_context_synchronously ---
   Future<void> _logout(BuildContext context, {String? message}) async {
-    if (!mounted) return;
+    // Jalankan semua operasi async terlebih dahulu
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool rememberMe = prefs.getBool('rememberMe') ?? false;
+    final String? username = prefs.getString('user_username');
+
     await prefs.clear();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (Route<dynamic> route) => false,
-        );
-        if (message != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message), backgroundColor: Colors.red),
-          );
-        }
-      }
-    });
+
+    if (rememberMe && username != null) {
+      await prefs.setBool('rememberMe', true);
+      await prefs.setString('user_username', username);
+    }
+
+    // Setelah semua await selesai, baru periksa 'mounted'
+    if (!mounted) return;
+
+    // Sekarang aman untuk menggunakan BuildContext
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (Route<dynamic> route) => false,
+    );
+    if (message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _startAutoRefreshTimer() {
     _autoRefreshTimer?.cancel();
-    // Ambil provider di sini. Gunakan read karena kita tidak perlu me-rebuild widget ini jika interval berubah.
-    // Perubahan akan diterapkan saat pengguna pindah tab.
+    if (!mounted) return;
     final settingsProvider = context.read<SettingsProvider>();
 
-    // Jika interval adalah 0 (Mati), jangan jalankan timer
     if (settingsProvider.refreshInterval == Duration.zero) {
       debugPrint("Auto refresh is OFF");
       return;
@@ -210,7 +218,6 @@ class _HomePageState extends State<HomePage> {
       "Starting auto refresh timer with interval: ${settingsProvider.refreshIntervalText}",
     );
     _autoRefreshTimer = Timer.periodic(
-      // Gunakan durasi dari provider
       settingsProvider.refreshInterval,
       (timer) {
         if (_selectedIndex != 2 &&
@@ -218,16 +225,14 @@ class _HomePageState extends State<HomePage> {
             mounted &&
             context.read<TicketProvider>().listState != ListState.loading &&
             !context.read<TicketProvider>().isLoadingMore) {
-          debugPrint(
-            "Auto refreshing tickets (background)...",
-          ); // diubah untuk logging
+          debugPrint("Auto refreshing tickets (background)...");
           context.read<TicketProvider>().fetchTickets(
-            status: _getStatusForAPI(),
-            category: _selectedCategory,
-            searchQuery: _searchController.text,
-            isRefresh: true,
-            isBackgroundRefresh: true, // DIUBAH: Tambahkan baris ini
-          );
+                status: _getStatusForAPI(),
+                category: _selectedCategory,
+                searchQuery: _searchController.text,
+                isRefresh: true,
+                isBackgroundRefresh: true,
+              );
         }
       },
     );
@@ -304,10 +309,8 @@ class _HomePageState extends State<HomePage> {
             });
             if (index != 2) {
               _triggerSearch();
-              // Mulai ulang timer jika kembali ke tab Home atau Riwayat untuk menerapkan interval baru
               _startAutoRefreshTimer();
             } else {
-              // Matikan timer jika pindah ke tab Profil
               _autoRefreshTimer?.cancel();
             }
           }
@@ -356,12 +359,11 @@ class _HomePageState extends State<HomePage> {
                         return _buildEmptyState();
                       case ListState.hasData:
                         return RefreshIndicator(
-                          onRefresh: () async => _triggerSearch(),
+                          onRefresh: _triggerSearch,
                           child: ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(0, 0, 0, 80),
-                            itemCount:
-                                provider.tickets.length +
+                            itemCount: provider.tickets.length +
                                 (provider.hasMore ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index < provider.tickets.length) {
@@ -400,7 +402,6 @@ class _HomePageState extends State<HomePage> {
     if (_selectedIndex == 2) {
       return const SizedBox.shrink();
     }
-
     return Row(
       children: [
         Image.asset(
@@ -451,11 +452,11 @@ class _HomePageState extends State<HomePage> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    fillColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     filled: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   onSubmitted: (value) => _triggerSearch(),
                 ),
@@ -487,10 +488,8 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 children: _statusHeaderFilters.map((status) {
                   final isSelected = _selectedStatus == status;
-                  // BARU: Tambahkan pengecekan tema
                   final isDarkMode =
                       Theme.of(context).brightness == Brightness.dark;
-
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: ChoiceChip(
@@ -502,50 +501,38 @@ class _HomePageState extends State<HomePage> {
                           _triggerSearch();
                         }
                       },
-                      selectedColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      // DIUBAH: Logika style label dibuat kondisional
+                      selectedColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       labelStyle: TextStyle(
                         color: isSelected
-                            // Jika terpilih:
                             ? isDarkMode
-                                  ? Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer // Gaya lama untuk tema gelap
-                                  : Theme.of(context)
-                                        .colorScheme
-                                        .primary // Gaya baru (biru) untuk tema terang
-                            // Jika tidak terpilih:
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer
+                                : Theme.of(context).colorScheme.primary
                             : Theme.of(context).textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.w500,
                       ),
-                      // DIUBAH: Logika garis pinggir dibuat kondisional
                       side: BorderSide(
                         color: isSelected
-                            // Jika terpilih:
                             ? isDarkMode
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer.withAlpha(
-                                      150,
-                                    ) // Gaya lama untuk tema gelap
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.primary.withOpacity(
-                                      0.5,
-                                    ) // Gaya baru (biru) untuk tema terang
-                            // Jika tidak terpilih:
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer
+                                    .withAlpha(150)
+                                // --- PERBAIKAN: deprecated_member_use ---
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withAlpha(128) // Menggunakan withAlpha
                             : isDarkMode
-                            ? Theme.of(context).colorScheme.outline.withAlpha(
-                                50,
-                              ) // Gaya lama untuk tema gelap
-                            : Colors
-                                  .grey
-                                  .shade300, // Gaya baru (abu-abu) untuk tema terang
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .outline
+                                    .withAlpha(50)
+                                : Colors.grey.shade300,
                       ),
                     ),
                   );
@@ -592,27 +579,27 @@ class _HomePageState extends State<HomePage> {
             );
             return AlertDialog(
               title: const Text('Filter Lanjutan'),
-              contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
+              contentPadding:
+                  const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Status', style: Theme.of(context).textTheme.bodySmall),
+                  Text('Status',
+                      style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: tempStatus,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12),
                     ),
-                    // DIUBAH: Tambahkan logika kondisional untuk style
                     items: _statusDialogFilters.map((status) {
                       return DropdownMenuItem<String>(
                         value: status,
                         child: Text(
                           status,
-                          // Jika status adalah 'Semua Status', gunakan style default (null).
-                          // Jika tidak, gunakan style dengan warna dan font tebal.
                           style: status == 'Semua Status'
                               ? null
                               : TextStyle(
@@ -623,8 +610,9 @@ class _HomePageState extends State<HomePage> {
                       );
                     }).toList(),
                     onChanged: (newValue) {
-                      if (newValue != null)
+                      if (newValue != null) {
                         setDialogState(() => tempStatus = newValue);
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
@@ -638,7 +626,8 @@ class _HomePageState extends State<HomePage> {
                     isExpanded: true,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12),
                     ),
                     items: _categories.entries
                         .map(
@@ -652,8 +641,9 @@ class _HomePageState extends State<HomePage> {
                         )
                         .toList(),
                     onChanged: (newValue) {
-                      if (newValue != null)
+                      if (newValue != null) {
                         setDialogState(() => tempCategory = newValue);
+                      }
                     },
                   ),
                 ],
@@ -679,21 +669,15 @@ class _HomePageState extends State<HomePage> {
                     OutlinedButton(
                       onPressed: () {
                         setDialogState(() {
-                          // Tentukan target reset berdasarkan status yang aktif di header
-                          final bool isHeaderFilterActive = _statusHeaderFilters
-                              .contains(_selectedStatus);
-
-                          // Jika filter header ('Semua Status' atau 'Waiting Reply') aktif,
-                          // reset ke nilai tersebut. Jika tidak, reset ke 'New'.
-                          tempStatus = isHeaderFilterActive
-                              ? _selectedStatus
-                              : 'New';
-
-                          // Kategori selalu di-reset ke 'All'
+                          final bool isHeaderFilterActive =
+                              _statusHeaderFilters.contains(_selectedStatus);
+                          tempStatus =
+                              isHeaderFilterActive ? _selectedStatus : 'New';
                           tempCategory = 'All';
                         });
                       },
-                      style: OutlinedButton.styleFrom(shape: buttonShape),
+                      style:
+                          OutlinedButton.styleFrom(shape: buttonShape),
                       child: const Text('Atur Ulang'),
                     ),
                   ],
@@ -707,73 +691,81 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyState() {
-    bool isSearching = _searchController.text.isNotEmpty;
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // DIUBAH: Ukuran ikon diperkecil
-            Icon(
-              isSearching ? Icons.search_off : Icons.inbox_outlined,
-              size: 60,
-              color: Colors.grey.shade400,
+    // --- PERBAIKAN: undefined_identifier 'isSearching' ---
+    final bool isSearching = _searchController.text.isNotEmpty;
+    
+    return RefreshIndicator(
+      onRefresh: _triggerSearch,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          alignment: Alignment.center,
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isSearching ? Icons.search_off : Icons.inbox_outlined,
+                  size: 60,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isSearching
+                      ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".'
+                      : 'Belum ada tiket yang cocok dengan filter yang aktif.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                ),
+                if (isSearching) ...[
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Hapus Pencarian'),
+                    onPressed: () => _searchController.clear(),
+                  ),
+                ],
+              ],
             ),
-            // DIUBAH: Jarak vertikal dikurangi
-            const SizedBox(height: 12),
-            // DIUBAH: Ukuran font judul diperkecil
-            Text(
-              isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            // DIUBAH: Jarak vertikal dikurangi
-            const SizedBox(height: 6),
-            // DIUBAH: Ukuran font sub-judul diperkecil
-            Text(
-              isSearching
-                  ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".'
-                  : 'Belum ada tiket yang cocok dengan filter yang aktif.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-            ),
-            if (isSearching) ...[
-              // DIUBAH: Jarak vertikal dikurangi
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Hapus Pencarian'),
-                onPressed: () => _searchController.clear(),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildErrorState(String error) {
+  Widget _buildErrorState(String rawError) {
+    final errorInfo = ErrorIdentifier.from(rawError);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.wifi_off_outlined, size: 80, color: Colors.red.shade300),
+            Icon(Icons.wifi_off_outlined,
+                size: 80, color: Colors.red.shade300),
             const SizedBox(height: 16),
             const Text(
-              'Oops, Terjadi Kesalahan',
+              'Gagal Memuat Data',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              error,
+              errorInfo.userMessage,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -781,6 +773,24 @@ class _HomePageState extends State<HomePage> {
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
             ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ErrorPage(
+                      message: errorInfo.userMessage,
+                      referenceCode: errorInfo.referenceCode,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.info_outline),
+              label: const Text('Lihat Detail Error'),
+              style:
+                  TextButton.styleFrom(foregroundColor: Colors.grey.shade700),
+            )
           ],
         ),
       ),
@@ -800,17 +810,16 @@ class _HomePageState extends State<HomePage> {
         child: FilledButton.icon(
           onPressed: () {
             context.read<TicketProvider>().loadMoreTickets(
-              status: _getStatusForAPI(),
-              category: _selectedCategory,
-              searchQuery: _searchController.text,
-            );
+                  status: _getStatusForAPI(),
+                  category: _selectedCategory,
+                  searchQuery: _searchController.text,
+                );
           },
           icon: const Icon(Icons.add_circle_outline),
           label: const Text('Tampilkan Lebih Banyak'),
           style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.primary,
             elevation: 1,
           ),
