@@ -10,7 +10,6 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization");
 // Menangani Pre-flight Request
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     http_response_code(200);
-    // Hentikan dan bersihkan buffer jika ini adalah request OPTIONS
     ob_end_flush(); 
     exit();
 }
@@ -18,14 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 // Set header utama untuk semua respons
 header('Content-Type: application/json');
 
-// Hapus baris ini dari skrip API. Atur di php.ini untuk server development jika perlu.
-// error_reporting(E_ALL);
-// ini_set('display_errors', 1);
-
 // AMANKAN ENDPOINT INI
 require 'auth_check.php';
 require 'koneksi.php';
-
 
 // Inisialisasi respons default
 $response = ['success' => false, 'message' => 'Terjadi kesalahan yang tidak diketahui.'];
@@ -41,16 +35,25 @@ try {
     $due_date_str = isset($_POST['due_date']) ? trim($_POST['due_date']) : '';
 
     if (empty($ticket_id)) {
-        // Ganti echo dengan throw exception agar ditangkap oleh blok catch
         throw new Exception('Ticket ID tidak boleh kosong.');
     }
 
     // 2. Mengubah Data Tekstual menjadi ID Sesuai Database
     $status_map = ['New' => 0, 'Waiting Reply' => 1, 'Replied' => 2, 'Resolved' => 3, 'In Progress' => 4, 'On Hold' => 5];
-    $priority_map = ['Critical' => 0, 'High' => 1, 'Medium' => 2, 'Low' => 3];
-
     $status_id = $status_map[$status_text] ?? 0;
+
+    // --- PERBAIKAN FINAL LOGIKA PRIORITAS (SESUAI STANDAR HESK) ---
+    // Ini adalah pemetaan yang paling benar dan seharusnya bekerja.
+    $priority_map = [
+        'Critical' => 1,
+        'High'     => 2,
+        'Medium'   => 3,
+        'Low'      => 4,
+    ];
+
+    // Mengambil ID prioritas dari map. Jika teks tidak ditemukan, default ke 3 (Low).
     $priority_id = $priority_map[$priority_text] ?? 3;
+    // --- AKHIR PERBAIKAN ---
 
     // Dapatkan ID kategori dari namanya
     $category_id = null;
@@ -115,23 +118,20 @@ try {
     }
 
 } catch (Exception $e) {
-    // Jika terjadi error di mana pun dalam blok try, tangkap di sini
-    http_response_code(500); // Set kode status server error
+    http_response_code(500);
     $response['success'] = false;
     $response['message'] = $e->getMessage();
 }
 
-// --- BAGIAN AKHIR YANG DIPERBAIKI ---
-
-// 1. Bersihkan semua output yang mungkin sudah ada (termasuk notice/warning PHP)
+// Bersihkan semua output yang mungkin sudah ada
 ob_clean();
 
-// 2. Cetak response sebagai JSON murni
+// Cetak response sebagai JSON murni
 echo json_encode($response);
 
-// 3. Tutup koneksi database
+// Tutup koneksi database
 mysqli_close($conn);
 
-// 4. Hentikan eksekusi skrip
+// Hentikan eksekusi skrip
 exit();
 ?>
