@@ -58,6 +58,44 @@ class DetailTabView extends StatelessWidget {
     required this.onClearDueDate,
   });
 
+  Widget _buildResolvedBanner(BuildContext context) {
+    // Tentukan warna berdasarkan tema terang/gelap
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color successColor = isDarkMode
+        ? Colors.greenAccent.shade400
+        : Colors.green.shade800;
+    final Color backgroundColor = isDarkMode
+        ? Colors.green.withOpacity(0.25)
+        : Colors.green.shade50;
+    final Color borderColor = isDarkMode
+        ? Colors.green.withOpacity(0.5)
+        : Colors.green.shade200;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline_rounded, color: successColor),
+          const SizedBox(width: 12),
+          Text(
+            'Tiket ini telah diselesaikan.',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: successColor,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -65,6 +103,11 @@ class DetailTabView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isResolved) ...[
+            _buildResolvedBanner(context),
+            const SizedBox(height: 16), // Beri jarak ke kartu di bawahnya
+          ],
+
           _buildTitledCard(
             context: context,
             icon: Icons.person_pin_circle_outlined,
@@ -72,24 +115,28 @@ class DetailTabView extends StatelessWidget {
             child: _buildInfoCardContent(context),
           ),
           const SizedBox(height: 16),
-          // PINDAHKAN KARTU DESKRIPSI KE ATAS SINI
+
+          // KARTU DESKRIPSI
           _buildDescriptionCard(context),
           const SizedBox(height: 16),
-          // PINDAHKAN KARTU DETAIL TIKET KE BAWAH SINI
+
+          // KARTU DETAIL TIKET
           _buildTitledCard(
             context: context,
             icon: Icons.list_alt_outlined,
             title: "Detail Tiket",
             child: _buildTicketDetailsContent(context),
           ),
-          const SizedBox(height: 16),
-          if (!isResolved)
+
+          if (!isResolved) ...[
+            const SizedBox(height: 16), // Beri jarak dari kartu detail
             _buildTitledCard(
               context: context,
               icon: Icons.construction_outlined,
               title: "Properti & Tindakan",
               child: _buildTindakanContent(context),
             ),
+          ],
         ],
       ),
     );
