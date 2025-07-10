@@ -1,5 +1,3 @@
-// lib/pages/login_page.dart
-
 import 'package:anri/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

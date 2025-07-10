@@ -1,5 +1,3 @@
-// lib/pages/ticket_detail/widgets/detail_tab_view.dart
-
 import 'package:anri/models/ticket_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';

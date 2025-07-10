@@ -1,6 +1,4 @@
-// lib/main.dart
-
-import 'package:anri/providers/settings_provider.dart'; // BARU
+import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
 import 'package:flutter/material.dart';
@@ -26,7 +24,6 @@ Future<void> main() async {
   );
 }
 
-// ... Sisa kode di file main.dart tidak perlu diubah ...
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -66,7 +63,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const SplashScreen(),
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, //mengilangkan banner debug
     );
   }
 }

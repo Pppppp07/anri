@@ -1,5 +1,3 @@
-// lib/pages/ticket_detail_screen.dart
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
@@ -252,6 +250,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       setState(() => _isSubmittingReply = false);
       return;
     }
+    // 1. Ambil SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    // 2. Dapatkan user_id yang tersimpan (default ke 1 jika tidak ada)
+    final int staffId = prefs.getInt('user_id') ?? 1;
+
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/add_reply.php'),
@@ -260,7 +263,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           'ticket_id': widget.ticket.id.toString(),
           'message': _replyMessageController.text,
           'new_status': _submitAsAction,
-          'staff_id': '1',
+          'staff_id': staffId.toString(),
           'staff_name': widget.currentUserName,
         },
       );

@@ -56,9 +56,9 @@ try {
     mysqli_begin_transaction($conn);
 
     // 1. Masukkan balasan ke tabel hesk_replies
-    $sql_reply = "INSERT INTO `hesk_replies` (`replyto`, `name`, `message`, `dt`, `staffid`) VALUES (?, ?, ?, NOW(), ?)";
+    $sql_reply = "INSERT INTO `hesk_replies` (`replyto`, `name`, `message`,`message_html`, `dt`, `staffid`) VALUES (?, ?, ?, ?, NOW(), ?)";
     $stmt_reply = mysqli_prepare($conn, $sql_reply);
-    mysqli_stmt_bind_param($stmt_reply, 'issi', $ticket_id, $staff_name, $message, $staff_id);
+    mysqli_stmt_bind_param($stmt_reply, 'isssi', $ticket_id, $staff_name, $message,$message, $staff_id);
     if (!mysqli_stmt_execute($stmt_reply)) {
         throw new Exception("Gagal menyimpan balasan: " . mysqli_stmt_error($stmt_reply));
     }

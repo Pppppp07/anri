@@ -1,5 +1,3 @@
-// lib/pages/splash_screen.dart
-
 import 'package:anri/home_page.dart';
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/providers/settings_provider.dart';
