@@ -14,7 +14,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anri/config/api_config.dart';
 import 'package:http/http.dart' as http;
 
-
 class HomePage extends StatefulWidget {
   final String currentUserName;
   final String authToken;
@@ -45,15 +44,36 @@ class _HomePageState extends State<HomePage> {
 
   final Map<String, String> _categories = {
     'All': 'Semua Kategori',
-    '1': 'Aplikasi Sistem Informasi', '2': 'SRIKANDI', '3': 'Layanan Kepegawaian',
-    '4': 'Perangkat Lunak', '5': 'Perangkat Keras', '6': 'Jaringan Komputer',
-    '7': 'Bangunan', '8': 'Mesin dan AC', '9': 'Listrik', '10': 'Kendaraan Dinas',
-    '11': 'Pengembalian BMN', '12': 'Insiden Siber', '13': 'Pusat Data Nasional',
-    '14': 'CCTV', '15': 'Email Dinas',
+    '1': 'Aplikasi Sistem Informasi',
+    '2': 'SRIKANDI',
+    '3': 'Layanan Kepegawaian',
+    '4': 'Perangkat Lunak',
+    '5': 'Perangkat Keras',
+    '6': 'Jaringan Komputer',
+    '7': 'Bangunan',
+    '8': 'Mesin dan AC',
+    '9': 'Listrik',
+    '10': 'Kendaraan Dinas',
+    '11': 'Pengembalian BMN',
+    '12': 'Insiden Siber',
+    '13': 'Pusat Data Nasional',
+    '14': 'CCTV',
+    '15': 'Email Dinas',
   };
 
-  final List<String> _statusHeaderFilters = ['Semua Status', 'New', 'Waiting Reply'];
-  final List<String> _statusDialogFilters = ['Semua Status', 'New', 'Waiting Reply', 'Replied', 'In Progress', 'On Hold'];
+  final List<String> _statusHeaderFilters = [
+    'Semua Status',
+    'New',
+    'Waiting Reply',
+  ];
+  final List<String> _statusDialogFilters = [
+    'Semua Status',
+    'New',
+    'Waiting Reply',
+    'Replied',
+    'In Progress',
+    'On Hold',
+  ];
 
   @override
   void initState() {
@@ -94,14 +114,14 @@ class _HomePageState extends State<HomePage> {
     _debounce?.cancel();
     super.dispose();
   }
-  
+
   void _triggerSearch() {
     context.read<TicketProvider>().fetchTickets(
-          status: _getStatusForAPI(),
-          category: _selectedCategory,
-          searchQuery: _searchController.text,
-          isRefresh: true,
-        );
+      status: _getStatusForAPI(),
+      category: _selectedCategory,
+      searchQuery: _searchController.text,
+      isRefresh: true,
+    );
   }
 
   String _getStatusForAPI() {
@@ -109,7 +129,7 @@ class _HomePageState extends State<HomePage> {
     if (_selectedStatus == 'Semua Status') return 'All';
     return _selectedStatus;
   }
-  
+
   Future<Map<String, String>> _getAuthHeaders() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('auth_token');
@@ -121,7 +141,7 @@ class _HomePageState extends State<HomePage> {
     }
     return {'Authorization': 'Bearer $token'};
   }
-  
+
   Future<void> _fetchTeamMembers() async {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty && mounted) return;
@@ -137,7 +157,6 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200 && mounted) {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
-
           final List<dynamic> data = responseData['data'];
           final List<String> fetchedMembers = data
               .map((user) => user['name'].toString())
@@ -187,7 +206,9 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    debugPrint("Starting auto refresh timer with interval: ${settingsProvider.refreshIntervalText}");
+    debugPrint(
+      "Starting auto refresh timer with interval: ${settingsProvider.refreshIntervalText}",
+    );
     _autoRefreshTimer = Timer.periodic(
       // Gunakan durasi dari provider
       settingsProvider.refreshInterval,
@@ -197,18 +218,21 @@ class _HomePageState extends State<HomePage> {
             mounted &&
             context.read<TicketProvider>().listState != ListState.loading &&
             !context.read<TicketProvider>().isLoadingMore) {
-          debugPrint("Auto refreshing tickets...");
+          debugPrint(
+            "Auto refreshing tickets (background)...",
+          ); // diubah untuk logging
           context.read<TicketProvider>().fetchTickets(
-                status: _getStatusForAPI(),
-                category: _selectedCategory,
-                searchQuery: _searchController.text,
-                isRefresh: true,
-              );
+            status: _getStatusForAPI(),
+            category: _selectedCategory,
+            searchQuery: _searchController.text,
+            isRefresh: true,
+            isBackgroundRefresh: true, // DIUBAH: Tambahkan baris ini
+          );
         }
       },
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -218,8 +242,14 @@ class _HomePageState extends State<HomePage> {
       gradient: isDarkMode
           ? null
           : const LinearGradient(
-              colors: [ Colors.white, Color(0xFFF0F4F8)],
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              colors: [
+                Colors.white,
+                Color(0xFFE0F2F7),
+                Color(0xFFBBDEFB),
+                Colors.blueAccent,
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
     );
 
@@ -233,7 +263,10 @@ class _HomePageState extends State<HomePage> {
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 16.0),
-                    child: Text('Hi, ${widget.currentUserName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      'Hi, ${widget.currentUserName}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ]
@@ -243,7 +276,9 @@ class _HomePageState extends State<HomePage> {
         children: [
           Container(
             decoration: _selectedIndex != 2 ? pageBackgroundDecoration : null,
-            color: _selectedIndex == 2 ? Theme.of(context).colorScheme.surfaceContainerLowest : null,
+            color: _selectedIndex == 2
+                ? Theme.of(context).colorScheme.surfaceContainerLowest
+                : null,
           ),
           _buildBody(),
         ],
@@ -262,11 +297,15 @@ class _HomePageState extends State<HomePage> {
         onTap: (index) {
           if (_selectedIndex != index) {
             _searchController.clear();
-            setState(() { _selectedIndex = index; _selectedCategory = 'All'; _selectedStatus = 'New'; });
+            setState(() {
+              _selectedIndex = index;
+              _selectedCategory = 'All';
+              _selectedStatus = 'New';
+            });
             if (index != 2) {
               _triggerSearch();
               // Mulai ulang timer jika kembali ke tab Home atau Riwayat untuk menerapkan interval baru
-              _startAutoRefreshTimer(); 
+              _startAutoRefreshTimer();
             } else {
               // Matikan timer jika pindah ke tab Profil
               _autoRefreshTimer?.cancel();
@@ -274,14 +313,26 @@ class _HomePageState extends State<HomePage> {
           }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Beranda'),
-          BottomNavigationBarItem(icon: Icon(Icons.history_outlined), activeIcon: Icon(Icons.history), label: 'Riwayat'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profil'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Beranda',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_outlined),
+            activeIcon: Icon(Icons.history),
+            label: 'Riwayat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profil',
+          ),
         ],
       ),
     );
   }
-  
+
   Widget _buildBody() {
     switch (_selectedIndex) {
       case 0:
@@ -309,15 +360,21 @@ class _HomePageState extends State<HomePage> {
                           child: ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(0, 0, 0, 80),
-                            itemCount: provider.tickets.length + (provider.hasMore ? 1 : 0),
+                            itemCount:
+                                provider.tickets.length +
+                                (provider.hasMore ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index < provider.tickets.length) {
                                 final ticket = provider.tickets[index];
                                 return TicketCard(
                                   ticket: ticket,
-                                  allCategories: _categories.entries.where((e) => e.key != 'All').map((e) => e.value).toList(),
+                                  allCategories: _categories.entries
+                                      .where((e) => e.key != 'All')
+                                      .map((e) => e.value)
+                                      .toList(),
                                   allTeamMembers: _teamMembers,
                                   currentUserName: widget.currentUserName,
+                                  onRefresh: _triggerSearch,
                                 );
                               } else {
                                 return _buildPaginationControl(provider);
@@ -343,25 +400,33 @@ class _HomePageState extends State<HomePage> {
     if (_selectedIndex == 2) {
       return const SizedBox.shrink();
     }
-    
+
     return Row(
       children: [
-        Image.asset('assets/images/anri_logo.png', height: 36, filterQuality: FilterQuality.high),
+        Image.asset(
+          'assets/images/anri_logo.png',
+          height: 36,
+          filterQuality: FilterQuality.high,
+        ),
         const SizedBox(width: 12),
         ShaderMask(
           blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) => const LinearGradient(
-            colors: [ Colors.lightBlueAccent, Colors.blue, Colors.blueAccent ],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: [Colors.lightBlueAccent, Colors.blue, Colors.blueAccent],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
-          child: const Text('Help Desk', style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'Help Desk',
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildHeaderFilterBar() {
-     return Container(
+    return Container(
       key: _headerFilterKey,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
@@ -376,9 +441,19 @@ class _HomePageState extends State<HomePage> {
                   decoration: InputDecoration(
                     hintText: 'Cari tiket...',
                     prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchController.text.isNotEmpty ? IconButton(icon: const Icon(Icons.clear, size: 20), onPressed: () => _searchController.clear()) : null,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () => _searchController.clear(),
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     filled: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
@@ -387,7 +462,11 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: Icon(Icons.filter_list_alt, color: Theme.of(context).colorScheme.primary, size: 28),
+                icon: Icon(
+                  Icons.filter_list_alt,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 28,
+                ),
                 onPressed: _showFilterDialog,
                 tooltip: 'Filter Lanjutan',
               ),
@@ -395,13 +474,23 @@ class _HomePageState extends State<HomePage> {
           ),
           if (_selectedIndex == 0) ...[
             const SizedBox(height: 16),
-            Text('Status', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontWeight: FontWeight.bold)),
+            Text(
+              'Status',
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodySmall?.color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: _statusHeaderFilters.map((status) {
                   final isSelected = _selectedStatus == status;
+                  // BARU: Tambahkan pengecekan tema
+                  final isDarkMode =
+                      Theme.of(context).brightness == Brightness.dark;
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: ChoiceChip(
@@ -413,14 +502,50 @@ class _HomePageState extends State<HomePage> {
                           _triggerSearch();
                         }
                       },
-                      selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      selectedColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      // DIUBAH: Logika style label dibuat kondisional
                       labelStyle: TextStyle(
-                        color: isSelected ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).textTheme.bodyLarge?.color,
+                        color: isSelected
+                            // Jika terpilih:
+                            ? isDarkMode
+                                  ? Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer // Gaya lama untuk tema gelap
+                                  : Theme.of(context)
+                                        .colorScheme
+                                        .primary // Gaya baru (biru) untuk tema terang
+                            // Jika tidak terpilih:
+                            : Theme.of(context).textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.w500,
                       ),
+                      // DIUBAH: Logika garis pinggir dibuat kondisional
                       side: BorderSide(
-                        color: isSelected ? Theme.of(context).colorScheme.primaryContainer.withAlpha(150) : Theme.of(context).colorScheme.outline.withAlpha(50),
+                        color: isSelected
+                            // Jika terpilih:
+                            ? isDarkMode
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer.withAlpha(
+                                      150,
+                                    ) // Gaya lama untuk tema gelap
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(
+                                      0.5,
+                                    ) // Gaya baru (biru) untuk tema terang
+                            // Jika tidak terpilih:
+                            : isDarkMode
+                            ? Theme.of(context).colorScheme.outline.withAlpha(
+                                50,
+                              ) // Gaya lama untuk tema gelap
+                            : Colors
+                                  .grey
+                                  .shade300, // Gaya baru (abu-abu) untuk tema terang
                       ),
                     ),
                   );
@@ -433,20 +558,27 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-  
+
   void _showFilterDialog() {
     String tempCategory = _selectedCategory;
     String tempStatus = _selectedStatus;
-    
+
     Color getStatusColor(String status) {
       switch (status) {
-        case 'New': return const Color(0xFFD32F2F);
-        case 'Waiting Reply': return const Color(0xFFE65100);
-        case 'Replied': return const Color(0xFF1976D2);
-        case 'In Progress': return const Color(0xFF673AB7);
-        case 'On Hold': return const Color(0xFFC2185B);
-        case 'Resolved': return const Color(0xFF388E3C);
-        default: return Colors.grey.shade700;
+        case 'New':
+          return const Color(0xFFD32F2F);
+        case 'Waiting Reply':
+          return const Color(0xFFE65100);
+        case 'Replied':
+          return const Color(0xFF1976D2);
+        case 'In Progress':
+          return const Color(0xFF673AB7);
+        case 'On Hold':
+          return const Color(0xFFC2185B);
+        case 'Resolved':
+          return const Color(0xFF388E3C);
+        default:
+          return Colors.grey.shade700;
       }
     }
 
@@ -455,7 +587,9 @@ class _HomePageState extends State<HomePage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
-            final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0));
+            final buttonShape = RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.0),
+            );
             return AlertDialog(
               title: const Text('Filter Lanjutan'),
               contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
@@ -467,19 +601,60 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: tempStatus,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12)),
-                    items: _statusDialogFilters.map((status) => DropdownMenuItem<String>(value: status, child: Text(status, style: TextStyle(color: getStatusColor(status), fontWeight: status == 'Semua Status' ? FontWeight.normal : FontWeight.bold)))).toList(),
-                    onChanged: (newValue) { if (newValue != null) setDialogState(() => tempStatus = newValue); },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    // DIUBAH: Tambahkan logika kondisional untuk style
+                    items: _statusDialogFilters.map((status) {
+                      return DropdownMenuItem<String>(
+                        value: status,
+                        child: Text(
+                          status,
+                          // Jika status adalah 'Semua Status', gunakan style default (null).
+                          // Jika tidak, gunakan style dengan warna dan font tebal.
+                          style: status == 'Semua Status'
+                              ? null
+                              : TextStyle(
+                                  color: getStatusColor(status),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null)
+                        setDialogState(() => tempStatus = newValue);
+                    },
                   ),
                   const SizedBox(height: 16),
-                  Text('Kategori', style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    'Kategori',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: tempCategory,
                     isExpanded: true,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12)),
-                    items: _categories.entries.map((entry) => DropdownMenuItem<String>(value: entry.key, child: Text(entry.value, overflow: TextOverflow.ellipsis))).toList(),
-                    onChanged: (newValue) { if (newValue != null) setDialogState(() => tempCategory = newValue); },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    items: _categories.entries
+                        .map(
+                          (entry) => DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(
+                              entry.value,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null)
+                        setDialogState(() => tempCategory = newValue);
+                    },
                   ),
                 ],
               ),
@@ -491,15 +666,33 @@ class _HomePageState extends State<HomePage> {
                     FilledButton(
                       onPressed: () {
                         Navigator.of(context).pop();
-                        setState(() { _selectedCategory = tempCategory; _selectedStatus = tempStatus; });
+                        setState(() {
+                          _selectedCategory = tempCategory;
+                          _selectedStatus = tempStatus;
+                        });
                         _triggerSearch();
                       },
                       style: FilledButton.styleFrom(shape: buttonShape),
                       child: const Text('Terapkan'),
                     ),
-                    const SizedBox(height: 8), 
+                    const SizedBox(height: 8),
                     OutlinedButton(
-                      onPressed: () { setDialogState(() { tempStatus = 'New'; tempCategory = 'All'; }); },
+                      onPressed: () {
+                        setDialogState(() {
+                          // Tentukan target reset berdasarkan status yang aktif di header
+                          final bool isHeaderFilterActive = _statusHeaderFilters
+                              .contains(_selectedStatus);
+
+                          // Jika filter header ('Semua Status' atau 'Waiting Reply') aktif,
+                          // reset ke nilai tersebut. Jika tidak, reset ke 'New'.
+                          tempStatus = isHeaderFilterActive
+                              ? _selectedStatus
+                              : 'New';
+
+                          // Kategori selalu di-reset ke 'All'
+                          tempCategory = 'All';
+                        });
+                      },
                       style: OutlinedButton.styleFrom(shape: buttonShape),
                       child: const Text('Atur Ulang'),
                     ),
@@ -515,26 +708,47 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildEmptyState() {
     bool isSearching = _searchController.text.isNotEmpty;
-    return Center(
+    return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(isSearching ? Icons.search_off : Icons.inbox_outlined, size: 80, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-            const SizedBox(height: 8),
+            // DIUBAH: Ukuran ikon diperkecil
+            Icon(
+              isSearching ? Icons.search_off : Icons.inbox_outlined,
+              size: 60,
+              color: Colors.grey.shade400,
+            ),
+            // DIUBAH: Jarak vertikal dikurangi
+            const SizedBox(height: 12),
+            // DIUBAH: Ukuran font judul diperkecil
             Text(
-              isSearching 
-                ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".' 
-                : 'Belum ada tiket yang cocok dengan filter yang aktif.',
+              isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            // DIUBAH: Jarak vertikal dikurangi
+            const SizedBox(height: 6),
+            // DIUBAH: Ukuran font sub-judul diperkecil
+            Text(
+              isSearching
+                  ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".'
+                  : 'Belum ada tiket yang cocok dengan filter yang aktif.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
             if (isSearching) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(icon: const Icon(Icons.arrow_back), label: const Text('Hapus Pencarian'), onPressed: () => _searchController.clear()),
+              // DIUBAH: Jarak vertikal dikurangi
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Hapus Pencarian'),
+                onPressed: () => _searchController.clear(),
+              ),
             ],
           ],
         ),
@@ -551,17 +765,28 @@ class _HomePageState extends State<HomePage> {
           children: [
             Icon(Icons.wifi_off_outlined, size: 80, color: Colors.red.shade300),
             const SizedBox(height: 16),
-            const Text('Oops, Terjadi Kesalahan', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text(
+              'Oops, Terjadi Kesalahan',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text(error, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(onPressed: _triggerSearch, icon: const Icon(Icons.refresh), label: const Text('Coba Lagi')),
+            ElevatedButton.icon(
+              onPressed: _triggerSearch,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildPaginationControl(TicketProvider provider) {
     if (provider.isLoadingMore) {
       return const Padding(
@@ -583,7 +808,9 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.add_circle_outline),
           label: const Text('Tampilkan Lebih Banyak'),
           style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.primary,
             elevation: 1,
           ),

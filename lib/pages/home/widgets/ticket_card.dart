@@ -10,6 +10,7 @@ class TicketCard extends StatelessWidget {
   final List<String> allCategories;
   final List<String> allTeamMembers;
   final String currentUserName;
+  final VoidCallback onRefresh;
 
   const TicketCard({
     super.key,
@@ -17,14 +18,15 @@ class TicketCard extends StatelessWidget {
     required this.allCategories,
     required this.allTeamMembers,
     required this.currentUserName,
+    required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
     final DateFormat formatter = DateFormat('d MMM yy, HH:mm', 'id_ID');
     // DIUBAH: Warna ID tiket dibuat adaptif
-    final Color idColor = Theme.of(context).brightness == Brightness.dark 
-        ? Colors.lightBlue.shade300 
+    final Color idColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.lightBlue.shade300
         : Theme.of(context).primaryColor;
 
     return Card(
@@ -35,7 +37,8 @@ class TicketCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () async {
-          Navigator.push(
+          // Tunggu hasil dari TicketDetailScreen
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => TicketDetailScreen(
@@ -46,6 +49,12 @@ class TicketCard extends StatelessWidget {
               ),
             ),
           );
+
+          // Jika hasilnya 'true' (artinya ada perubahan yang disimpan),
+          // panggil fungsi onRefresh.
+          if (result == true) {
+            onRefresh();
+          }
         },
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -75,20 +84,40 @@ class TicketCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 ticket.subject,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 10),
-              _buildInfoRow(context: context, icon: Icons.person_outline, text: ticket.requesterName),
+              _buildInfoRow(
+                context: context,
+                icon: Icons.person_outline,
+                text: ticket.requesterName,
+              ),
               const SizedBox(height: 8),
-              _buildInfoRow(context: context, icon: Icons.category_outlined, text: ticket.categoryName),
+              _buildInfoRow(
+                context: context,
+                icon: Icons.category_outlined,
+                text: ticket.categoryName,
+              ),
               const SizedBox(height: 8),
-              _buildInfoRow(context: context, icon: Icons.business, text: ticket.custom1),
+              _buildInfoRow(
+                context: context,
+                icon: Icons.business,
+                text: ticket.custom1,
+              ),
               Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
-                  title: const Text('Lihat Detail Lainnya...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  title: const Text(
+                    'Lihat Detail Lainnya...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   tilePadding: EdgeInsets.zero,
                   childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
                   children: [
@@ -98,7 +127,10 @@ class TicketCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     _buildDetailRow('Balasan Terakhir', ticket.lastReplierText),
                     const SizedBox(height: 6),
-                    _buildDetailRow('Update Terakhir', formatter.format(ticket.lastChange)),
+                    _buildDetailRow(
+                      'Update Terakhir',
+                      formatter.format(ticket.lastChange),
+                    ),
                   ],
                 ),
               ),
@@ -118,7 +150,11 @@ class TicketCard extends StatelessWidget {
       ),
       child: Text(
         status.toUpperCase(),
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -132,19 +168,33 @@ class TicketCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Image.asset(_getPriorityIconPath(priority), height: 12, width: 12, color: _getPriorityColor(priority)),
+          Image.asset(
+            _getPriorityIconPath(priority),
+            height: 12,
+            width: 12,
+            color: _getPriorityColor(priority),
+          ),
           const SizedBox(width: 4),
           Text(
             priority,
-            style: TextStyle(color: _getPriorityColor(priority), fontWeight: FontWeight.bold, fontSize: 11),
+            style: TextStyle(
+              color: _getPriorityColor(priority),
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow({required BuildContext context, required IconData icon, required String text}) {
-    final Color iconColor = Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey;
+  Widget _buildInfoRow({
+    required BuildContext context,
+    required IconData icon,
+    required String text,
+  }) {
+    final Color iconColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey;
     return Row(
       children: [
         Icon(icon, size: 16, color: iconColor.withOpacity(0.7)),
@@ -159,14 +209,17 @@ class TicketCard extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildDetailRow(String label, String value) {
-     return Row(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
           width: 112,
-          child: Text('$label:', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          child: Text(
+            '$label:',
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -181,36 +234,53 @@ class TicketCard extends StatelessWidget {
       ],
     );
   }
-  
+
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'New': return const Color(0xFFD32F2F);
-      case 'Waiting Reply': return const Color(0xFFE65100);
-      case 'Replied': return const Color(0xFF1976D2);
-      case 'In Progress': return const Color(0xFF673AB7);
-      case 'On Hold': return const Color(0xFFC2185B);
-      case 'Resolved': return const Color(0xFF388E3C);
-      default: return Colors.grey.shade700;
+      case 'New':
+        return const Color(0xFFD32F2F);
+      case 'Waiting Reply':
+        return const Color(0xFFE65100);
+      case 'Replied':
+        return const Color(0xFF1976D2);
+      case 'In Progress':
+        return const Color(0xFF673AB7);
+      case 'On Hold':
+        return const Color(0xFFC2185B);
+      case 'Resolved':
+        return const Color(0xFF388E3C);
+      default:
+        return Colors.grey.shade700;
     }
   }
 
   String _getPriorityIconPath(String priority) {
-     switch (priority) {
-      case 'Critical': return 'assets/images/label-critical.png';
-      case 'High': return 'assets/images/label-high.png';
-      case 'Medium': return 'assets/images/label-medium.png';
-      case 'Low': return 'assets/images/label-low.png';
-      default: return 'assets/images/label-medium.png';
+    switch (priority) {
+      case 'Critical':
+        return 'assets/images/label-critical.png';
+      case 'High':
+        return 'assets/images/label-high.png';
+      case 'Medium':
+        return 'assets/images/label-medium.png';
+      case 'Low':
+        return 'assets/images/label-low.png';
+      default:
+        return 'assets/images/label-medium.png';
     }
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority) {
-      case 'Critical': return Colors.red.shade400;
-      case 'High': return Colors.orange.shade400;
-      case 'Medium': return Colors.lightGreen.shade400;
-      case 'Low': return Colors.lightBlue.shade400;
-      default: return Colors.grey;
+      case 'Critical':
+        return Colors.red.shade400;
+      case 'High':
+        return Colors.orange.shade400;
+      case 'Medium':
+        return Colors.lightGreen.shade400;
+      case 'Low':
+        return Colors.lightBlue.shade400;
+      default:
+        return Colors.grey;
     }
   }
 }
