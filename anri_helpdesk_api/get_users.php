@@ -35,7 +35,7 @@ try {
     $users[] = ['name' => 'Unassigned'];
 
     // Fitur 2: Ambil semua pengguna kecuali dengan ID 9999
-    $sql = "SELECT `name` FROM `hesk_users` WHERE `id` != 9999 ORDER BY `name` ASC";
+    $sql = "SELECT `name` FROM `hesk_users` WHERE `id` != 9999 AND name != 'admin' ORDER BY `name` ASC";
     $result = mysqli_query($conn, $sql);
 
     if ($result) {
