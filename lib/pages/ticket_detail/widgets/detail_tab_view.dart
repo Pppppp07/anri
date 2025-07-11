@@ -386,6 +386,7 @@ class DetailTabView extends StatelessWidget {
 
   // --- HELPER WIDGETS ---
 
+  // GANTI SELURUH FUNGSI INI
   Widget _buildInfoRow(
     BuildContext context,
     IconData icon,
@@ -394,29 +395,40 @@ class DetailTabView extends StatelessWidget {
     Color? statusColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(
+        vertical: 6.0,
+      ), // Sedikit tambah padding vertikal
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment:
+            CrossAxisAlignment.start, // PENTING: Agar semua item rata atas
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: Theme.of(context).textTheme.bodySmall?.color,
-          ),
-          const SizedBox(width: 12),
+          // Kolom 1: Ikon dan Label (Lebar tetap)
           SizedBox(
-            width: 95,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Theme.of(context).textTheme.bodySmall?.color,
-              ),
+            width: 125, // Atur lebar tetap untuk kolom label
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // Kolom 2: Nilai (Fleksibel)
           Expanded(
             child: Text(
               value,
               style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+              softWrap: true, // Pastikan teks bisa turun baris
             ),
           ),
         ],
