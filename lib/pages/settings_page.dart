@@ -16,10 +16,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // State untuk notifikasi masih lokal karena belum ada providernya
   bool _notificationsEnabled = true;
 
-  // Fungsi untuk mendapatkan teks dari enum ThemeMode
   String _getThemeText(ThemeMode themeMode) {
     switch (themeMode) {
       case ThemeMode.light:
@@ -32,7 +30,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // Fungsi untuk memicu otentikasi biometrik/PIN
   Future<bool> _authenticate() async {
     final LocalAuthentication auth = LocalAuthentication();
     bool authenticated = false;
@@ -58,7 +55,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Ambil semua provider yang dibutuhkan
     final themeProvider = context.watch<ThemeProvider>();
     final settingsProvider = context.watch<SettingsProvider>();
 
@@ -125,7 +121,8 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          color: Theme.of(context).primaryColor,
+          // --- PERBAIKAN: Gunakan warna sekunder untuk kontras lebih baik ---
+          color: Theme.of(context).colorScheme.secondary,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
           fontSize: 12,
@@ -141,9 +138,16 @@ class _SettingsPageState extends State<SettingsPage> {
     VoidCallback? onTap,
   }) {
     return ListTile(
-      leading: Icon(icon),
+      // --- PERBAIKAN: Beri warna eksplisit pada ikon ---
+      leading: Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
       title: Text(title),
-      subtitle: currentValue != null ? Text(currentValue, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)) : null,
+      // --- PERBAIKAN: Ganti warna subtitle agar lebih terlihat ---
+      subtitle: currentValue != null 
+          ? Text(
+              currentValue,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)
+            ) 
+          : null,
       trailing: const Icon(Icons.chevron_right, size: 20),
       onTap: onTap,
     );
@@ -236,16 +240,14 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
               await prefs.clear();
-              // Refresh provider setelah cache dihapus
-              if (mounted) {
-                context.read<ThemeProvider>().setThemeMode(ThemeMode.system);
-                context.read<SettingsProvider>().setRefreshInterval(15);
-                context.read<SettingsProvider>().setAppLock(false);
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Cache berhasil dihapus! Pengaturan direset ke default.'))
-                );
-              }
+              if (!mounted) return;
+              context.read<ThemeProvider>().setThemeMode(ThemeMode.system);
+              context.read<SettingsProvider>().setRefreshInterval(15);
+              context.read<SettingsProvider>().setAppLock(false);
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Cache berhasil dihapus! Pengaturan direset ke default.'))
+              );
             },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,

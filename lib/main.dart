@@ -12,12 +12,75 @@ Future<void> main() async {
   await initializeDateFormatting('id_ID', null);
   await dotenv.load(fileName: ".env");
 
+  // --- SOLUSI YANG LEBIH AMAN DAN BENAR ---
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    // Di mode debug, kita tetap ingin melihat error aslinya di konsol.
+    debugPrint(details.toString());
+    
+    // Kembalikan sebuah widget yang sangat sederhana dan mandiri.
+    // Ini untuk menggantikan "Layar Merah" yang default.
+    return Material(
+      child: Container(
+        color: const Color(0xFF212f3c), // Warna latar gelap agar nyaman dilihat
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.orangeAccent,
+                  size: 60,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Oops, Terjadi Masalah Saat Membangun Tampilan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Silakan coba restart aplikasi. Jika masalah berlanjut, hubungi developer dengan informasi error di bawah ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+                const SizedBox(height: 20),
+                // Menampilkan detail error yang lebih sederhana untuk dilaporkan
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    details.exception.toString(), // Menampilkan error aslinya
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+  // --- AKHIR BLOK SOLUSI ---
+  
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => TicketProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => SettingsProvider()), // BARU
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: const MyApp(),
     ),

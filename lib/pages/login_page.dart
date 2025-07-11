@@ -128,12 +128,8 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           final String? authToken = responseData['token'];
 
           if (authToken != null) {
-            if (_rememberMe) {
-              await _saveCredentials(userData: userData, token: authToken);
-            } else {
-              await _clearCredentials();
-            }
-
+            await _saveCredentials(userData: userData, token: authToken);
+            
             if (mounted) {
               Navigator.pushReplacement(
                 context,
@@ -174,7 +170,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    // DIUBAH: Latar belakang sekarang adaptif terhadap tema
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final loginPageDecoration = BoxDecoration(
       gradient: LinearGradient(
@@ -313,16 +308,49 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: _rememberMe,
-                                    onChanged: (bool? newValue) =>
-                                        setState(() => _rememberMe = newValue!),
-                                    activeColor: Theme.of(context).primaryColor,
-                                  ),
-                                  const Text('Ingat Saya'),
-                                ],
+                              // --- PERBAIKAN TOTAL PADA CHECKBOX DAN TEKS ---
+                              InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _rememberMe = !_rememberMe;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _rememberMe,
+                                      onChanged: (bool? newValue) {
+                                        setState(() {
+                                          _rememberMe = newValue!;
+                                        });
+                                      },
+                                      // Warna tanda centang
+                                      checkColor: Theme.of(context).colorScheme.onPrimary,
+                                      // Mengontrol warna isian kotak
+                                      fillColor: MaterialStateProperty.resolveWith<Color>(
+                                        (Set<MaterialState> states) {
+                                          // Warna saat dicentang
+                                          if (states.contains(MaterialState.selected)) {
+                                            return Theme.of(context).colorScheme.primary;
+                                          }
+                                          // Warna saat tidak dicentang (di tema gelap)
+                                          if(isDarkMode) {
+                                            return Colors.white70;
+                                          }
+                                          // Warna default saat tidak dicentang (di tema terang)
+                                          return Theme.of(context).unselectedWidgetColor;
+                                        },
+                                      ),
+                                    ),
+                                    Text(
+                                      'Ingat Saya',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
