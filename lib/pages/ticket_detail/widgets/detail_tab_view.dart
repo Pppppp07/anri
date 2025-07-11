@@ -1,5 +1,3 @@
-// lib/pages/ticket_detail/widgets/detail_tab_view.dart
-
 import 'package:anri/models/ticket_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -60,6 +58,44 @@ class DetailTabView extends StatelessWidget {
     required this.onClearDueDate,
   });
 
+  Widget _buildResolvedBanner(BuildContext context) {
+    // Tentukan warna berdasarkan tema terang/gelap
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color successColor = isDarkMode
+        ? Colors.greenAccent.shade400
+        : Colors.green.shade800;
+    final Color backgroundColor = isDarkMode
+        ? Colors.green.withOpacity(0.25)
+        : Colors.green.shade50;
+    final Color borderColor = isDarkMode
+        ? Colors.green.withOpacity(0.5)
+        : Colors.green.shade200;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline_rounded, color: successColor),
+          const SizedBox(width: 12),
+          Text(
+            'Tiket ini telah diselesaikan.',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: successColor,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -67,6 +103,11 @@ class DetailTabView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isResolved) ...[
+            _buildResolvedBanner(context),
+            const SizedBox(height: 16), // Beri jarak ke kartu di bawahnya
+          ],
+
           _buildTitledCard(
             context: context,
             icon: Icons.person_pin_circle_outlined,
@@ -74,24 +115,28 @@ class DetailTabView extends StatelessWidget {
             child: _buildInfoCardContent(context),
           ),
           const SizedBox(height: 16),
-          // PINDAHKAN KARTU DESKRIPSI KE ATAS SINI
+
+          // KARTU DESKRIPSI
           _buildDescriptionCard(context),
           const SizedBox(height: 16),
-          // PINDAHKAN KARTU DETAIL TIKET KE BAWAH SINI
+
+          // KARTU DETAIL TIKET
           _buildTitledCard(
             context: context,
             icon: Icons.list_alt_outlined,
             title: "Detail Tiket",
             child: _buildTicketDetailsContent(context),
           ),
-          const SizedBox(height: 16),
-          if (!isResolved)
+
+          if (!isResolved) ...[
+            const SizedBox(height: 16), // Beri jarak dari kartu detail
             _buildTitledCard(
               context: context,
               icon: Icons.construction_outlined,
               title: "Properti & Tindakan",
               child: _buildTindakanContent(context),
             ),
+          ],
         ],
       ),
     );
@@ -341,6 +386,7 @@ class DetailTabView extends StatelessWidget {
 
   // --- HELPER WIDGETS ---
 
+  // GANTI SELURUH FUNGSI INI
   Widget _buildInfoRow(
     BuildContext context,
     IconData icon,
@@ -349,29 +395,40 @@ class DetailTabView extends StatelessWidget {
     Color? statusColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(
+        vertical: 6.0,
+      ), // Sedikit tambah padding vertikal
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment:
+            CrossAxisAlignment.start, // PENTING: Agar semua item rata atas
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: Theme.of(context).textTheme.bodySmall?.color,
-          ),
-          const SizedBox(width: 12),
+          // Kolom 1: Ikon dan Label (Lebar tetap)
           SizedBox(
-            width: 95,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Theme.of(context).textTheme.bodySmall?.color,
-              ),
+            width: 125, // Atur lebar tetap untuk kolom label
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+              ],
             ),
           ),
+
+          // Kolom 2: Nilai (Fleksibel)
           Expanded(
             child: Text(
               value,
               style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+              softWrap: true, // Pastikan teks bisa turun baris
             ),
           ),
         ],

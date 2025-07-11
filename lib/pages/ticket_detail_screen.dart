@@ -1,5 +1,3 @@
-// lib/pages/ticket_detail_screen.dart
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
@@ -35,6 +33,8 @@ class TicketDetailScreen extends StatefulWidget {
 class _TicketDetailScreenState extends State<TicketDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late Ticket _currentTicket;
+  bool _hasChanges = false;
 
   late String _selectedStatus;
   late String _selectedPriority;
@@ -74,18 +74,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+     _currentTicket = widget.ticket;
     _initializeState();
-    _fetchTicketDetails();
+    _refreshTicketData();
   }
 
   void _initializeState() {
-    _selectedStatus = widget.ticket.statusText;
-    _selectedPriority = widget.ticket.priorityText;
-    _selectedCategory = widget.ticket.categoryName;
-    _assignedTo = widget.ticket.ownerName;
-    _dueDate = widget.ticket.dueDate;
+    _selectedStatus = _currentTicket.statusText;
+    _selectedPriority = _currentTicket.priorityText;
+    _selectedCategory = _currentTicket.categoryName;
+    _assignedTo = _currentTicket.ownerName;
+    _dueDate = _currentTicket.dueDate;
     _isResolved = _selectedStatus == 'Resolved';
-    _workedDuration = _parseDuration(widget.ticket.timeWorked);
+    _workedDuration = _parseDuration(_currentTicket.timeWorked);
   }
 
   @override
@@ -148,41 +149,49 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
   }
 
-  Future<void> _fetchTicketDetails() async {
-    setState(() => _isLoadingDetails = true);
+    Future<void> _refreshTicketData() async {
+    // Jangan tampilkan loading indicator jika hanya refresh biasa
+    if (mounted) setState(() => _isLoadingDetails = true);
+
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) {
-      setState(() => _isLoadingDetails = false);
+      if (mounted) setState(() => _isLoadingDetails = false);
       return;
     }
     final url = Uri.parse(
       '${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}',
     );
+
     try {
-      final response = await http
-          .get(url, headers: headers)
-          .timeout(const Duration(seconds: 15));
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
       if (!mounted) return;
+
       if (response.statusCode == 401) {
         _logout(message: 'Sesi tidak valid.');
         return;
       }
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true) {
+        if (data['success'] == true && data['ticket_details'] != null) {
+          // Buat objek tiket baru dari data yang di-fetch
+          final newTicketData = Ticket.fromJson(data['ticket_details']);
           final repliesData = data['replies'] as List;
+
           setState(() {
+            // Perbarui state dengan data baru
+            _currentTicket = newTicketData;
             _replies = repliesData.map((data) => Reply.fromJson(data)).toList();
+            // Panggil kembali initializeState untuk menyinkronkan UI (dropdown, dll)
+            _initializeState();
           });
         } else {
-          throw Exception('Gagal memuat detail dari API.');
+          throw Exception(data['message'] ?? 'Gagal memuat detail dari API.');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saat refresh: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoadingDetails = false);
@@ -216,13 +225,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       if (!mounted) return;
       final data = json.decode(response.body);
       if (data['success'] == true) {
+        setState(() => _hasChanges = true); // Tandai ada perubahan
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Perubahan berhasil disimpan!'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true);
+        await _refreshTicketData();
       } else {
         throw Exception(data['message'] ?? 'Gagal menyimpan perubahan.');
       }
@@ -253,6 +263,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       setState(() => _isSubmittingReply = false);
       return;
     }
+    // 1. Ambil SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    // 2. Dapatkan user_id yang tersimpan (default ke 1 jika tidak ada)
+    final int staffId = prefs.getInt('user_id') ?? 1;
+
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/add_reply.php'),
@@ -261,20 +276,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           'ticket_id': widget.ticket.id.toString(),
           'message': _replyMessageController.text,
           'new_status': _submitAsAction,
-          'staff_id': '1', // Ganti dengan ID user yang login jika perlu
+          'staff_id': staffId.toString(),
           'staff_name': widget.currentUserName,
         },
       );
       if (!mounted) return;
       final data = json.decode(response.body);
       if (data['success'] == true) {
+        setState(() => _hasChanges = true);
+        _replyMessageController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Balasan berhasil dikirim!'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true);
+        await _refreshTicketData(); // Refresh data di halaman ini
+        // HAPUS BARIS INI: Navigator.pop(context, true);
       } else {
         throw Exception(data['message'] ?? 'Gagal mengirim balasan.');
       }
@@ -449,77 +467,82 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             ),
     );
 
-    final List<String> currentTeamMemberOptions =
-        List.from(widget.allTeamMembers);
-    if (!currentTeamMemberOptions.contains(_assignedTo)) {
-      currentTeamMemberOptions.add(_assignedTo);
-    }
-    
-    final List<String> currentCategoryOptions =
-        List.from(widget.allCategories);
-    if (!currentCategoryOptions.contains(_selectedCategory)) {
-      currentCategoryOptions.add(_selectedCategory);
-    }
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 1,
-        title: const Text('Detail Tiket'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.info_outline), text: "Detail & Tindakan"),
-            Tab(icon: Icon(Icons.forum_outlined), text: "Riwayat & Balas"),
-          ],
+     return PopScope(
+      canPop: false, // Cegah pop otomatis
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        // Kirim hasil `_hasChanges` saat pop manual
+        Navigator.of(context).pop(_hasChanges);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          elevation: 1,
+          // DIUBAH: Tambahkan tombol kembali kustom
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.of(context).pop(_hasChanges);
+            },
+          ),
+          title: const Text('Detail Tiket'),
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(icon: Icon(Icons.info_outline), text: "Detail & Tindakan"),
+              Tab(icon: Icon(Icons.forum_outlined), text: "Riwayat & Balas"),
+            ],
+          ),
         ),
-      ),
-      body: Container(
-        decoration: pageBackgroundDecoration,
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            DetailTabView(
-              ticket: widget.ticket,
-              isResolved: _isResolved,
-              isSaving: _isSaving,
-              workedDuration: _workedDuration,
-              dueDate: _dueDate,
-              selectedStatus: _selectedStatus,
-              selectedPriority: _selectedPriority,
-              selectedCategory: _selectedCategory,
-              assignedTo: _assignedTo,
-              statusOptions: _statusOptions,
-              priorityOptions: _priorityOptions,
-              categoryOptions: currentCategoryOptions,
-              teamMemberOptions: currentTeamMemberOptions,
-              onStatusChanged: (val) {
-                if (val != null) setState(() => _selectedStatus = val);
-              },
-              onPriorityChanged: (val) {
-                if (val != null) setState(() => _selectedPriority = val);
-              },
-              onCategoryChanged: (val) {
-                if (val != null) setState(() => _selectedCategory = val);
-              },
-              onOwnerChanged: (val) {
-                if (val != null) setState(() => _assignedTo = val);
-              },
-              onSaveChanges: _saveChanges,
-              onTapTimeWorked: _showTimeWorkedEditor,
-              onTapDueDate: _showDueDateEditor,
-              onClearDueDate: () => setState(() => _dueDate = null),
-              timeWorkedBar: _buildTimeWorkedBar(),
-              actionShortcuts: _buildActionShortcuts(),
-            ),
-            ReplyHistoryTabView(
-              isLoadingDetails: _isLoadingDetails,
-              replies: _replies,
-              // --- PERBAIKAN 1: undefined_identifier 'isResolved' ---
-              isResolved: _isResolved,
-              replyForm: _buildReplyForm(),
-            ),
-          ],
+        body: Container(
+          decoration: pageBackgroundDecoration,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              DetailTabView(
+                // --- PERBAIKAN DI SINI ---
+                ticket: _currentTicket, // Gunakan baris ini
+                // HAPUS BARIS INI: ticket: widget.ticket,
+                isResolved: _isResolved,
+                isSaving: _isSaving,
+                workedDuration: _workedDuration,
+                dueDate: _dueDate,
+                selectedStatus: _selectedStatus,
+                selectedPriority: _selectedPriority,
+                selectedCategory: _selectedCategory,
+                assignedTo: _assignedTo,
+                statusOptions: _statusOptions,
+                priorityOptions: _priorityOptions,
+                categoryOptions: widget.allCategories,
+                teamMemberOptions: widget.allTeamMembers,
+                onStatusChanged: (val) {
+                  if (val != null) setState(() => _selectedStatus = val);
+                },
+                onPriorityChanged: (val) {
+                  if (val != null) setState(() => _selectedPriority = val);
+                },
+                onCategoryChanged: (val) {
+                  if (val != null) setState(() => _selectedCategory = val);
+                },
+                onOwnerChanged: (val) {
+                  if (val != null) setState(() => _assignedTo = val);
+                },
+                onSaveChanges: _saveChanges,
+                onTapTimeWorked: _showTimeWorkedEditor,
+                onTapDueDate: _showDueDateEditor,
+                onClearDueDate: () => setState(() => _dueDate = null),
+                timeWorkedBar: _buildTimeWorkedBar(),
+                actionShortcuts: _buildActionShortcuts(),
+              ),
+              ReplyHistoryTabView(
+                isLoadingDetails: _isLoadingDetails,
+                replies: _replies,
+                isResolved: _isResolved,
+                replyForm: _buildReplyForm(),
+              ),
+            ],
+          ),
         ),
       ),
     );

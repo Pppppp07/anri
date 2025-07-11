@@ -1,7 +1,3 @@
-// lib/main.dart
-
-// Hapus impor yang tidak perlu untuk ErrorPage dan ErrorHandler di sini
-// karena builder akan dibuat mandiri.
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
@@ -91,7 +87,6 @@ Future<void> main() async {
   );
 }
 
-// Sisa kode MyApp tidak ada perubahan
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -131,7 +126,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const SplashScreen(),
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, //mengilangkan banner debug
     );
   }
 }

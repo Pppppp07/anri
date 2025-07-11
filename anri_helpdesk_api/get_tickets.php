@@ -30,10 +30,17 @@ try {
     $status_filter_text = isset($_GET['status']) ? trim($_GET['status']) : 'All';
     $category_filter = isset($_GET['category']) ? trim($_GET['category']) : 'All';
     $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+    // BARU: Tambahkan variabel untuk filter prioritas
+    $priority_filter_text = isset($_GET['priority']) ? trim($_GET['priority']) : 'All';
 
     $status_map = [
         'New' => 0, 'Waiting Reply' => 1, 'Replied' => 2,
         'Resolved' => 3, 'In Progress' => 4, 'On Hold' => 5,
+    ];
+
+    // BARU: Tambahkan map untuk prioritas
+    $priority_map = [
+        'Critical' => 1, 'High' => 2, 'Medium' => 3, 'Low' => 4,
     ];
 
     $sql = "SELECT t.id, t.trackid, t.name AS requester_name, t.subject, t.dt AS creation_date, t.lastchange, t.status, t.priority, t.lastreplier, t.message, t.replies, t.time_worked, t.due_date, c.name AS category_name, o.name AS owner_name, lr.name AS last_replier_name, t.custom1, t.custom2 FROM `hesk_tickets` AS t LEFT JOIN `hesk_categories` AS c ON t.category = c.id LEFT JOIN `hesk_users` AS o ON t.owner = o.id LEFT JOIN `hesk_users` AS lr ON t.replierid = lr.id";
@@ -51,6 +58,13 @@ try {
     else if (array_key_exists($status_filter_text, $status_map)) {
         $conditions[] = "t.status = ?";
         $params[] = $status_map[$status_filter_text];
+        $types .= 'i';
+    }
+
+    // BARU: Tambahkan logika untuk filter prioritas
+    if ($priority_filter_text != 'All' && array_key_exists($priority_filter_text, $priority_map)) {
+        $conditions[] = "t.priority = ?";
+        $params[] = $priority_map[$priority_filter_text];
         $types .= 'i';
     }
 

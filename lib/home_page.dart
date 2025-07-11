@@ -1,5 +1,3 @@
-// lib/home_page.dart
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
@@ -34,6 +32,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   String _selectedCategory = 'All';
   String _selectedStatus = 'New';
+  String _selectedPriority = 'All';
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounce;
@@ -77,6 +76,14 @@ class _HomePageState extends State<HomePage> {
     'On Hold',
   ];
 
+  final List<String> _priorityDialogFilters = [
+    'All',
+    'Critical',
+    'High',
+    'Medium',
+    'Low',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -116,14 +123,14 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _triggerSearch() async {
-    if (!mounted) return;
-    await context.read<TicketProvider>().fetchTickets(
-          status: _getStatusForAPI(),
-          category: _selectedCategory,
-          searchQuery: _searchController.text,
-          isRefresh: true,
-        );
+  void _triggerSearch() {
+    context.read<TicketProvider>().fetchTickets(
+      status: _getStatusForAPI(),
+      category: _selectedCategory,
+      searchQuery: _searchController.text,
+      priority: _selectedPriority,
+      isRefresh: true,
+    );
   }
 
   String _getStatusForAPI() {
@@ -227,15 +234,48 @@ class _HomePageState extends State<HomePage> {
             !context.read<TicketProvider>().isLoadingMore) {
           debugPrint("Auto refreshing tickets (background)...");
           context.read<TicketProvider>().fetchTickets(
-                status: _getStatusForAPI(),
-                category: _selectedCategory,
-                searchQuery: _searchController.text,
-                isRefresh: true,
-                isBackgroundRefresh: true,
-              );
+
+            status: _getStatusForAPI(),
+            category: _selectedCategory,
+            searchQuery: _searchController.text,
+            priority: _selectedPriority,
+            isRefresh: true,
+            isBackgroundRefresh: true,
+          );
         }
       },
     );
+  }
+
+  String _getPriorityIconPath(String priority) {
+    switch (priority) {
+      case 'Critical':
+        return 'assets/images/label-critical.png';
+      case 'High':
+        return 'assets/images/label-high.png';
+      case 'Medium':
+        return 'assets/images/label-medium.png';
+      case 'Low':
+        return 'assets/images/label-low.png';
+      default:
+        // Default icon jika tidak ada yang cocok
+        return 'assets/images/label-medium.png';
+    }
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority) {
+      case 'Critical':
+        return Colors.red.shade400;
+      case 'High':
+        return Colors.orange.shade400;
+      case 'Medium':
+        return Colors.lightGreen.shade400;
+      case 'Low':
+        return Colors.lightBlue.shade400;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -359,7 +399,7 @@ class _HomePageState extends State<HomePage> {
                         return _buildEmptyState();
                       case ListState.hasData:
                         return RefreshIndicator(
-                          onRefresh: _triggerSearch,
+                          onRefresh: () async => _triggerSearch(),
                           child: ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(0, 0, 0, 80),
@@ -549,23 +589,17 @@ class _HomePageState extends State<HomePage> {
   void _showFilterDialog() {
     String tempCategory = _selectedCategory;
     String tempStatus = _selectedStatus;
+    String tempPriority = _selectedPriority; 
 
     Color getStatusColor(String status) {
       switch (status) {
-        case 'New':
-          return const Color(0xFFD32F2F);
-        case 'Waiting Reply':
-          return const Color(0xFFE65100);
-        case 'Replied':
-          return const Color(0xFF1976D2);
-        case 'In Progress':
-          return const Color(0xFF673AB7);
-        case 'On Hold':
-          return const Color(0xFFC2185B);
-        case 'Resolved':
-          return const Color(0xFF388E3C);
-        default:
-          return Colors.grey.shade700;
+        case 'New': return const Color(0xFFD32F2F);
+        case 'Waiting Reply': return const Color(0xFFE65100);
+        case 'Replied': return const Color(0xFF1976D2);
+        case 'In Progress': return const Color(0xFF673AB7);
+        case 'On Hold': return const Color(0xFFC2185B);
+        case 'Resolved': return const Color(0xFF388E3C);
+        default: return Colors.grey.shade700;
       }
     }
 
@@ -579,74 +613,111 @@ class _HomePageState extends State<HomePage> {
             );
             return AlertDialog(
               title: const Text('Filter Lanjutan'),
-              contentPadding:
-                  const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Status',
-                      style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
-                    value: tempStatus,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    items: _statusDialogFilters.map((status) {
-                      return DropdownMenuItem<String>(
-                        value: status,
-                        child: Text(
-                          status,
-                          style: status == 'Semua Status'
-                              ? null
-                              : TextStyle(
-                                  color: getStatusColor(status),
-                                  fontWeight: FontWeight.bold,
-                                ),
+
+              contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 24.0),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_selectedIndex == 0) ...[
+                      Text('Status', style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 4),
+                      DropdownButtonFormField<String>(
+                        value: tempStatus,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (newValue) {
-                      if (newValue != null) {
-                        setDialogState(() => tempStatus = newValue);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Kategori',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
-                    value: tempCategory,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    items: _categories.entries
-                        .map(
-                          (entry) => DropdownMenuItem<String>(
-                            value: entry.key,
+                        items: _statusDialogFilters.map((status) {
+                          return DropdownMenuItem<String>(
+                            value: status,
                             child: Text(
-                              entry.value,
-                              overflow: TextOverflow.ellipsis,
+                              status,
+                              style: status == 'Semua Status'
+                                  ? null
+                                  : TextStyle(
+                                      color: getStatusColor(status),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                             ),
+                          );
+                        }).toList(),
+                        onChanged: (newValue) {
+                          if (newValue != null)
+                            setDialogState(() => tempStatus = newValue);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Dropdown Prioritas
+                    Text('Prioritas', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      value: tempPriority,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _priorityDialogFilters.map((priority) {
+                        if (priority == 'All') {
+                          return DropdownMenuItem<String>(
+                            value: priority,
+                            child: const Text('Semua Prioritas'),
+                          );
+                        }
+                        return DropdownMenuItem<String>(
+                          value: priority,
+                          child: Row(
+                            children: [
+                              Image.asset(
+                                _getPriorityIconPath(priority),
+                                width: 16, height: 16,
+                                color: _getPriorityColor(priority),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                priority,
+                                style: TextStyle(
+                                  color: _getPriorityColor(priority),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          setDialogState(() => tempPriority = newValue);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    Text('Kategori', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      value: tempCategory,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      items: _categories.entries.map((entry) => 
+                        DropdownMenuItem<String>(
+                          value: entry.key,
+                          child: Text(entry.value, overflow: TextOverflow.ellipsis),
                         )
-                        .toList(),
-                    onChanged: (newValue) {
-                      if (newValue != null) {
-                        setDialogState(() => tempCategory = newValue);
-                      }
-                    },
-                  ),
-                ],
+                      ).toList(),
+                      onChanged: (newValue) {
+                        if (newValue != null)
+                          setDialogState(() => tempCategory = newValue);
+                      },
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 Column(
@@ -659,6 +730,7 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedCategory = tempCategory;
                           _selectedStatus = tempStatus;
+                          _selectedPriority = tempPriority;
                         });
                         _triggerSearch();
                       },
@@ -669,10 +741,12 @@ class _HomePageState extends State<HomePage> {
                     OutlinedButton(
                       onPressed: () {
                         setDialogState(() {
-                          final bool isHeaderFilterActive =
-                              _statusHeaderFilters.contains(_selectedStatus);
-                          tempStatus =
-                              isHeaderFilterActive ? _selectedStatus : 'New';
+                          if (_selectedIndex == 0) {
+                            final bool isHeaderFilterActive = _statusHeaderFilters.contains(_selectedStatus);
+                            tempStatus = isHeaderFilterActive ? _selectedStatus : 'New';
+                          }
+                          // Selalu reset prioritas dan kategori
+                          tempPriority = 'All'; 
                           tempCategory = 'All';
                         });
                       },
@@ -691,55 +765,50 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyState() {
-    // --- PERBAIKAN: undefined_identifier 'isSearching' ---
-    final bool isSearching = _searchController.text.isNotEmpty;
-    
-    return RefreshIndicator(
-      onRefresh: _triggerSearch,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          alignment: Alignment.center,
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  isSearching ? Icons.search_off : Icons.inbox_outlined,
-                  size: 60,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  isSearching
-                      ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".'
-                      : 'Belum ada tiket yang cocok dengan filter yang aktif.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                ),
-                if (isSearching) ...[
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('Hapus Pencarian'),
-                    onPressed: () => _searchController.clear(),
-                  ),
-                ],
-              ],
+    bool isSearching = _searchController.text.isNotEmpty;
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // DIUBAH: Ukuran ikon diperkecil
+            Icon(
+              isSearching ? Icons.search_off : Icons.inbox_outlined,
+              size: 60,
+              color: Colors.grey.shade400,
             ),
-          ),
+            // DIUBAH: Jarak vertikal dikurangi
+            const SizedBox(height: 12),
+            // DIUBAH: Ukuran font judul diperkecil
+            Text(
+              isSearching ? 'Tiket Tidak Ditemukan' : 'Tidak Ada Tiket',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            // DIUBAH: Jarak vertikal dikurangi
+            const SizedBox(height: 6),
+            // DIUBAH: Ukuran font sub-judul diperkecil
+            Text(
+              isSearching
+                  ? 'Tidak ada tiket yang cocok dengan pencarian "${_searchController.text}".'
+                  : 'Belum ada tiket yang cocok dengan filter yang aktif.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            ),
+            if (isSearching) ...[
+              // DIUBAH: Jarak vertikal dikurangi
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Hapus Pencarian'),
+                onPressed: () => _searchController.clear(),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -810,10 +879,11 @@ class _HomePageState extends State<HomePage> {
         child: FilledButton.icon(
           onPressed: () {
             context.read<TicketProvider>().loadMoreTickets(
-                  status: _getStatusForAPI(),
-                  category: _selectedCategory,
-                  searchQuery: _searchController.text,
-                );
+              status: _getStatusForAPI(),
+              category: _selectedCategory,
+              searchQuery: _searchController.text,
+              priority: _selectedPriority, // <-- TAMBAHKAN INI
+            );
           },
           icon: const Icon(Icons.add_circle_outline),
           label: const Text('Tampilkan Lebih Banyak'),

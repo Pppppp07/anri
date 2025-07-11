@@ -36,16 +36,14 @@ class TicketProvider with ChangeNotifier {
     return {'Authorization': 'Bearer $token'};
   }
 
-  // BARU: Fungsi terpisah untuk mengambil satu halaman data
-  // Ini membantu menghindari duplikasi kode.
-  Future<List<Ticket>> _fetchPage(int page, String status, String category, String searchQuery) async {
+  Future<List<Ticket>> _fetchPage(int page, String status, String category, String searchQuery, String priority) async {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) {
       throw Exception('Sesi tidak valid. Silakan login kembali.');
     }
 
     final url = Uri.parse(
-      '${ApiConfig.baseUrl}/get_tickets.php?status=$status&category=$category&page=$page&search=$searchQuery',
+      '${ApiConfig.baseUrl}/get_tickets.php?status=$status&category=$category&page=$page&search=$searchQuery&priority=$priority',
     );
     
     final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 20));
@@ -64,12 +62,11 @@ class TicketProvider with ChangeNotifier {
     }
   }
 
-
-  // DIUBAH: Logika fetchTickets dirombak total
   Future<void> fetchTickets({
     required String status,
     required String category,
     required String searchQuery,
+    required String priority, // Tambahkan ini
     bool isRefresh = false,
     bool isBackgroundRefresh = false,
   }) async {
@@ -83,11 +80,10 @@ class TicketProvider with ChangeNotifier {
         
         // Ambil kembali semua halaman yang sudah dimuat
         for (int i = 1; i <= pagesToRefresh; i++) {
-          final pageData = await _fetchPage(i, status, category, searchQuery);
+          final pageData = await _fetchPage(i, status, category, searchQuery, priority);
           refreshedTickets.addAll(pageData);
         }
         
-        // Ganti data lama dengan data yang sudah di-refresh total
         _tickets = refreshedTickets;
         // Set ulang `hasMore` berdasarkan hasil fetch halaman terakhir
         _hasMore = _tickets.length % 10 == 0 && _tickets.isNotEmpty;
@@ -113,7 +109,7 @@ class TicketProvider with ChangeNotifier {
     }
 
     try {
-      final newTickets = await _fetchPage(_currentPage, status, category, searchQuery);
+      final newTickets = await _fetchPage(_currentPage, status, category, searchQuery, priority);
       
       if (_currentPage == 1) {
         _tickets = newTickets;
@@ -132,11 +128,11 @@ class TicketProvider with ChangeNotifier {
     }
   }
 
-
   Future<void> loadMoreTickets({
     required String status,
     required String category,
     required String searchQuery,
+    required String priority, // Tambahkan ini
   }) async {
     if (_isLoadingMore || !_hasMore) return;
 
@@ -144,11 +140,11 @@ class TicketProvider with ChangeNotifier {
     notifyListeners();
 
     _currentPage++;
-    // Panggil fetchTickets, tapi ini akan jatuh ke logika pemuatan normal, bukan background
     await fetchTickets(
       status: status,
       category: category,
       searchQuery: searchQuery,
+      priority: priority, // Tambahkan ini
       isRefresh: false
     );
 
