@@ -1,55 +1,25 @@
 <?php
-// Mulai output buffering untuk file ini juga.
 ob_start();
 
-// Hapus atau comment baris error reporting
-/*
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-*/
-
-// --- HEADER CORS ---
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    ob_end_clean();
-    exit();
-}
-// --- AKHIR HEADER CORS ---
+require 'cors_handler.php';
 
 function get_bearer_token() {
-    $authHeader = null;
     $headers = getallheaders();
-
-    if (isset($headers['Authorization'])) {
-        $authHeader = $headers['Authorization'];
-    } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-        $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-    }
-
-    if ($authHeader !== null) {
-        if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
-            return $matches[1];
-        }
+    $authHeader = $headers['Authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+    if ($authHeader !== null && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        return $matches[1];
     }
     return null;
 }
 
 $token_from_user = get_bearer_token();
-
 if (!$token_from_user) {
-    ob_clean(); // Bersihkan buffer sebelum mengirim error
+    ob_clean();
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Akses ditolak: Token tidak ditemukan.']);
     exit();
 }
 
-// Pisahkan token
 $token_parts = explode(':', $token_from_user);
 if (count($token_parts) !== 2) {
     ob_clean();
@@ -58,7 +28,6 @@ if (count($token_parts) !== 2) {
     exit();
 }
 list($selector, $token) = $token_parts;
-
 
 require 'koneksi.php';
 
@@ -78,7 +47,26 @@ if ($auth_token_row = mysqli_fetch_assoc($result)) {
         echo json_encode(['success' => false, 'message' => 'Akses ditolak: Token tidak cocok.']);
         exit();
     }
-    // Jika sukses, jangan kirim output apa pun. Biarkan skrip pemanggil yang melanjutkan.
+    
+    // --- BARU: Sediakan info pengguna yang login untuk file lain ---
+    $user_id_from_token = $auth_token_row['user_id'];
+    $sql_user = "SELECT id, name, user FROM hesk_users WHERE id = ? LIMIT 1";
+    $stmt_user = mysqli_prepare($conn, $sql_user);
+    mysqli_stmt_bind_param($stmt_user, "i", $user_id_from_token);
+    mysqli_stmt_execute($stmt_user);
+    $result_user = mysqli_stmt_get_result($stmt_user);
+
+    if ($current_user_details = mysqli_fetch_assoc($result_user)) {
+        // Definisikan variabel global untuk digunakan oleh file yang memanggil skrip ini
+        $GLOBALS['current_user_id'] = $current_user_details['id'];
+        $GLOBALS['current_user_name'] = $current_user_details['name'];
+    } else {
+        ob_clean();
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Akses ditolak: Pengguna dari token tidak ditemukan.']);
+        exit();
+    }
+    // --- AKHIR BLOK BARU ---
 
 } else {
     ob_clean();
@@ -86,7 +74,4 @@ if ($auth_token_row = mysqli_fetch_assoc($result)) {
     echo json_encode(['success' => false, 'message' => 'Akses ditolak: Token tidak valid atau kedaluwarsa.']);
     exit();
 }
-
-// Jangan tutup koneksi, jangan bersihkan buffer jika valid, agar skrip pemanggil bisa lanjut.
-// mysqli_close($conn);
 ?>

@@ -5,27 +5,13 @@ ob_start();
 /**
  * Pengaturan error reporting sebaiknya diatur di file php.ini server.
  * Menghapusnya dari sini adalah praktik yang lebih aman untuk produksi.
- *
- * error_reporting(E_ALL);
- * ini_set('display_errors', 1);
  */
 
 // AMANKAN ENDPOINT INI (Sudah Benar)
 require 'auth_check.php';
 require 'koneksi.php';
 
-// --- HEADER CORS (Sudah Benar) ---
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-// Handle pre-flight request
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    ob_end_clean(); // Hentikan dan bersihkan buffer
-    exit();
-}
-// --- AKHIR HEADER CORS ---
+require 'cors_handler.php';
 
 $response = ['success' => false, 'data' => [], 'message' => 'Gagal mengambil data pengguna.'];
 $users = [];
@@ -34,8 +20,8 @@ try {
     // Fitur 1: Selalu tambahkan 'Unassigned' sebagai opsi pertama.
     $users[] = ['name' => 'Unassigned'];
 
-    // Fitur 2: Ambil semua pengguna kecuali dengan ID 9999
-    $sql = "SELECT `name` FROM `hesk_users` WHERE `id` != 9999 AND name != 'admin' ORDER BY `name` ASC";
+    // --- PERBAIKAN: Hapus kondisi `AND name != 'admin'` ---
+    $sql = "SELECT `name` FROM `hesk_users` WHERE `id` != 9999 ORDER BY `name` ASC";
     $result = mysqli_query($conn, $sql);
 
     if ($result) {
@@ -46,8 +32,6 @@ try {
         $response['data'] = $users;
         $response['message'] = 'Data pengguna berhasil diambil.';
     } else {
-        // Ini tidak akan ditampilkan ke user karena error SQL akan ditangkap oleh catch block,
-        // tapi baik untuk logika internal.
         throw new Exception(mysqli_error($conn));
     }
 } catch (Exception $e) {

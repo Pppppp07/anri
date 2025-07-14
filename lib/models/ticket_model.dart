@@ -1,5 +1,31 @@
 // lib/models/ticket_model.dart
 
+// --- BARU: Model untuk data lampiran ---
+class Attachment {
+  final int id;
+  final String realName;
+  final String url;
+  final int size; // dalam bytes
+
+  Attachment({
+    required this.id,
+    required this.realName,
+    required this.url,
+    required this.size,
+  });
+
+  factory Attachment.fromJson(Map<String, dynamic> json) {
+    return Attachment(
+      id: json['id'] as int,
+      realName: json['real_name'] ?? 'unknown_file',
+      url: json['url'] ?? '',
+      size: json['size'] as int? ?? 0,
+    );
+  }
+}
+// --- AKHIR MODEL BARU ---
+
+
 class Ticket {
   final int id;
   final String trackid;
@@ -18,6 +44,8 @@ class Ticket {
   final DateTime? dueDate;
   final String custom1;
   final String custom2;
+  // --- BARU: Tambahkan list lampiran di sini ---
+  final List<Attachment> attachments;
 
   Ticket({
     required this.id,
@@ -37,9 +65,10 @@ class Ticket {
     this.dueDate,
     required this.custom1,
     required this.custom2,
+    this.attachments = const [], // Default ke list kosong
   });
 
-  factory Ticket.fromJson(Map<String, dynamic> json) {
+  factory Ticket.fromJson(Map<String, dynamic> json, {List<Attachment> attachments = const []}) {
     return Ticket(
       id: json['id'] as int,
       trackid: json['trackid'] ?? 'N/A',
@@ -58,8 +87,10 @@ class Ticket {
       dueDate: json['due_date'] != null ? DateTime.parse(json['due_date']) : null,
       custom1: json['custom1'] ?? '-',
       custom2: json['custom2'] ?? '-',
+      // --- BARU: Isi list lampiran dari data JSON ---
+      attachments: attachments,
     );
   }
 }
 
-enum ListState { loading, error, empty, hasData }
+// --- DIHAPUS: Enum ListState yang redundan telah dihapus dari file ini ---

@@ -2,17 +2,7 @@
 // Mulai output buffering untuk menangkap semua kemungkinan output liar
 ob_start();
 
-// --- HEADER CORS UNTUK MENGIZINKAN AKSES DARI FLUTTER WEB ---
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-// Menangani Pre-flight Request (penting untuk browser)
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    ob_end_flush();
-    exit();
-}
+require 'cors_handler.php';
 
 // HAPUS BARIS INI: Atur error reporting di php.ini, bukan di skrip API
 // error_reporting(E_ALL);

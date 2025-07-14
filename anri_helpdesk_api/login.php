@@ -1,35 +1,12 @@
 <?php
-// Perbaikan Lengkap untuk login.php
 
-// 1. Mulai output buffering untuk menangkap semua output.
-// Ini mencegah "notice" atau "warning" PHP merusak output JSON.
 ob_start();
 
-/**
- * Pengaturan error reporting sebaiknya diatur di file php.ini pada server Anda, bukan di dalam skrip.
- * Untuk lingkungan produksi, atur: display_errors = Off dan log_errors = On.
- * Baris di bawah ini sengaja dihapus atau di-comment agar lebih aman.
- *
- * error_reporting(E_ALL);
- * ini_set('display_errors', 1);
- */
 
-// 2. Muat koneksi yang sudah menggunakan .env untuk kredensial.
-// Pastikan file 'koneksi.php' Anda sudah diperbaiki sesuai panduan sebelumnya.
+
 require 'koneksi.php';
 
-// --- HEADER CORS (Sudah Benar) ---
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-// Handle pre-flight request (OPTIONS)
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    ob_end_clean(); // Bersihkan buffer dan hentikan skrip
-    exit();
-}
-// --- AKHIR HEADER CORS ---
+require 'cors_handler.php';
 
 // Inisialisasi array response default
 $response = ['success' => false, 'message' => 'Terjadi kesalahan yang tidak diketahui.'];

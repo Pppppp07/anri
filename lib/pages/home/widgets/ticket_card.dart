@@ -19,10 +19,44 @@ class TicketCard extends StatelessWidget {
     required this.onRefresh,
   });
 
+  // --- BARU: Widget untuk menampilkan ikon penugasan ---
+  Widget _buildOwnerIcon(BuildContext context) {
+    // Jika tiket ditugaskan ke pengguna saat ini
+    if (ticket.ownerName.toLowerCase() == currentUserName.toLowerCase() && ticket.ownerName != 'Unassigned') {
+      return Tooltip(
+        message: 'Ditugaskan ke Anda',
+        child: Icon(
+          Icons.person,
+          color: Theme.of(context).colorScheme.primary,
+          size: 20,
+        ),
+      );
+    }
+    // Jika tiket ditugaskan ke orang lain
+    if (ticket.ownerName != 'Unassigned') {
+      return Tooltip(
+        message: 'Ditugaskan ke: ${ticket.ownerName}',
+        child: Icon(
+          Icons.group_outlined,
+          color: Theme.of(context).textTheme.bodySmall?.color,
+          size: 20,
+        ),
+      );
+    }
+    // Jika tidak ditugaskan (Unassigned)
+    return Tooltip(
+      message: 'Belum ditugaskan',
+      child: Icon(
+        Icons.person_add_disabled_outlined,
+        color: Colors.grey.shade400,
+        size: 20,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final DateFormat formatter = DateFormat('d MMM yy, HH:mm', 'id_ID');
-    // DIUBAH: Warna ID tiket dibuat adaptif
     final Color idColor = Theme.of(context).brightness == Brightness.dark
         ? Colors.lightBlue.shade300
         : Theme.of(context).primaryColor;
@@ -35,7 +69,6 @@ class TicketCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () async {
-          // Tunggu hasil dari TicketDetailScreen
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
@@ -47,9 +80,6 @@ class TicketCard extends StatelessWidget {
               ),
             ),
           );
-
-          // Jika hasilnya 'true' (artinya ada perubahan yang disimpan),
-          // panggil fungsi onRefresh.
           if (result == true) {
             onRefresh();
           }
@@ -61,17 +91,24 @@ class TicketCard extends StatelessWidget {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '#${ticket.trackid}',
-                    style: TextStyle(
-                      color: idColor, // Menggunakan warna adaptif
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Flexible(
+                    child: Text(
+                      '#${ticket.trackid}',
+                      style: TextStyle(
+                        color: idColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      _buildOwnerIcon(context), // <-- Ikon baru ditambahkan di sini
+                      const SizedBox(width: 8),
                       _buildStatusChip(ticket.statusText),
                       const SizedBox(width: 8),
                       _buildPriorityChip(context, ticket.priorityText),
