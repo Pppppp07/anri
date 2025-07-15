@@ -71,12 +71,53 @@ class TicketProvider with ChangeNotifier {
     bool isRefresh = false,
     bool isBackgroundRefresh = false,
   }) async {
+    // Logika khusus untuk auto-refresh di latar belakang
+    if (isBackgroundRefresh) {
+      try {
+        List<Ticket> refreshedTickets = [];
+        // Ambil kembali semua halaman yang sudah ditampilkan, dari halaman 1 sampai halaman saat ini (_currentPage)
+        for (var i = 1; i <= _currentPage; i++) {
+          List<Ticket> pageData;
+          if (assignee.isNotEmpty) {
+            pageData = await _fetchMyTicketsPage(
+              i,
+              status,
+              searchQuery,
+              priority,
+              category,
+            );
+          } else {
+            pageData = await _fetchAllTicketsPage(
+              i,
+              status,
+              category,
+              searchQuery,
+              priority,
+            );
+          }
+          refreshedTickets.addAll(pageData);
+          // Optimisasi: jika halaman yang diambil datanya kurang dari 10, hentikan loop
+          if (pageData.length < 10) {
+            _hasMore = false;
+            break;
+          }
+        }
+
+        _tickets =
+            refreshedTickets; // Ganti daftar tiket dengan data yang sudah di-refresh sepenuhnya
+        _sortTickets();
+        _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
+        notifyListeners();
+      } catch (e) {
+        debugPrint("Background refresh failed: $e"); // Gagal secara diam-diam
+      }
+      return; // Keluar dari fungsi agar tidak menjalankan logika di bawah
+    }
+
+    // Logika yang digunakan untuk Pull-to-Refresh manual dan Load More
     if (isRefresh) {
       _currentPage = 1;
       _hasMore = true;
-    }
-
-    if (!isBackgroundRefresh) {
       _listState = ListState.loading;
       notifyListeners();
     }
@@ -86,6 +127,7 @@ class TicketProvider with ChangeNotifier {
       if (assignee.isNotEmpty) {
         newTickets = await _fetchMyTicketsPage(
           _currentPage,
+          status,
           searchQuery,
           priority,
           category,
@@ -134,8 +176,11 @@ class TicketProvider with ChangeNotifier {
     try {
       List<Ticket> newTickets;
       if (assignee.isNotEmpty) {
+        // --- LOKASI PERBAIKAN #1 ---
+        // Panggil method dengan 5 argumen, termasuk 'status'
         newTickets = await _fetchMyTicketsPage(
           _currentPage,
+          status,
           searchQuery,
           priority,
           category,
@@ -184,8 +229,11 @@ class TicketProvider with ChangeNotifier {
     return _fetchData(url, headers);
   }
 
+  // --- LOKASI PERBAIKAN #2 ---
+  // Hapus definisi method duplikat yang lama, hanya sisakan satu definisi ini.
   Future<List<Ticket>> _fetchMyTicketsPage(
     int page,
+    String status,
     String searchQuery,
     String priority,
     String category,
@@ -196,6 +244,7 @@ class TicketProvider with ChangeNotifier {
     final url = Uri.parse('${ApiConfig.baseUrl}/get_my_tickets.php').replace(
       queryParameters: {
         'page': page.toString(),
+        'status': status,
         'q': searchQuery,
         'priority': priority,
         'category': category,

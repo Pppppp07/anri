@@ -14,7 +14,7 @@ try {
 
     $status_filter_text = isset($_GET['status']) ? trim($_GET['status']) : 'All';
     $category_filter = isset($_GET['category']) ? trim($_GET['category']) : 'All';
-    $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $search_query = isset($_GET['q']) ? trim($_GET['q']) : '';
     $priority_filter_text = isset($_GET['priority']) ? trim($_GET['priority']) : 'All';
     $assignee_filter = isset($_GET['assignee']) ? trim($_GET['assignee']) : '';
 
@@ -51,7 +51,7 @@ try {
     }
 
     if (!empty($conditions)) { $sql .= " WHERE " . implode(" AND ", $conditions); }
-    $sql .= " ORDER BY t.priority ASC, t.lastchange DESC";
+    $sql .= " ORDER BY t.lastchange DESC";
     $sql .= " LIMIT ? OFFSET ?";
     $params[] = $limit;
     $params[] = $offset;

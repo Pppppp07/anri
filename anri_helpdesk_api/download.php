@@ -10,7 +10,7 @@ if (empty($file_name)) {
     die('Error: Nama file tidak spesifik.');
 }
 
-$file_path = $_SERVER['DOCUMENT_ROOT'] . '/hesk346/attachments/' . $file_name;
+$file_path = $_SERVER['DOCUMENT_ROOT'] . '/hesk/attachments/' . $file_name;
 
 
 // --- BAGIAN UNTUK VERIFIKASI (Jika masih gagal) ---

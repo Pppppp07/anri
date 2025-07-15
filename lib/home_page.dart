@@ -160,9 +160,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _getStatusForAPI() {
-    if (_selectedIndex == 1) return 'Resolved';
-    if (_currentView == TicketView.assignedToMe) return 'All';
-    if (_selectedStatus == 'Semua Status') return 'All';
+    // Prioritas #1: Jika di halaman Riwayat (index 1), selalu tampilkan yang 'Resolved'.
+    if (_selectedIndex == 1) {
+      return 'Resolved';
+    }
+
+    // Prioritas #2: Jika di Beranda (index 0) DAN tab 'Untuk Saya', tampilkan tiket 'Active'.
+    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe) {
+      return 'Active';
+    }
+
+    // Logika fallback untuk Beranda -> Semua Tiket
+    if (_selectedStatus == 'Semua Status') {
+      return 'All';
+    }
     return _selectedStatus;
   }
 
@@ -491,6 +502,8 @@ class _HomePageState extends State<HomePage> {
                             if (index < provider.tickets.length) {
                               final ticket = provider.tickets[index];
                               return TicketCard(
+                                // TAMBAHKAN KEY UNIK DI SINI
+                                key: ValueKey(ticket.id),
                                 ticket: ticket,
                                 allCategories: _categories.entries
                                     .where((e) => e.key != 'All')
@@ -601,7 +614,7 @@ class _HomePageState extends State<HomePage> {
                   controller: _searchController,
                   focusNode: _searchFocusNode,
                   decoration: InputDecoration(
-                    hintText: 'Cari di antara tiket yang tampil...',
+                    hintText: 'Cari tiket...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
