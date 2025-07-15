@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum ListState { loading, hasData, empty, error }
 
-enum SortDirection { asc, desc }
+enum SortType { byDate, byPriority }
 
 class TicketProvider with ChangeNotifier {
   List<Ticket> _tickets = [];
@@ -19,14 +19,14 @@ class TicketProvider with ChangeNotifier {
   bool _isLoadingMore = false;
   int _currentPage = 1;
 
-  SortDirection _prioritySortDirection = SortDirection.desc; 
+  SortType _currentSortType = SortType.byDate;
 
   List<Ticket> get tickets => _tickets;
   ListState get listState => _listState;
   String get errorMessage => _errorMessage;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
-  SortDirection get prioritySortDirection => _prioritySortDirection;
+  SortType get currentSortType => _currentSortType;
 
   final Map<String, int> _priorityMap = {
     'Low': 0,
@@ -37,24 +37,29 @@ class TicketProvider with ChangeNotifier {
 
   void _sortTickets() {
     _tickets.sort((a, b) {
-      // --- PERBAIKAN: Menggunakan `priorityText` bukan `priority` ---
-      final priorityA = _priorityMap[a.priorityText] ?? -1;
-      final priorityB = _priorityMap[b.priorityText] ?? -1;
-      
-      if (_prioritySortDirection == SortDirection.asc) {
-        return priorityA.compareTo(priorityB);
-      } else {
-        return priorityB.compareTo(priorityA);
+      switch (_currentSortType) {
+        case SortType.byPriority:
+          final priorityA = _priorityMap[a.priorityText] ?? -1;
+          final priorityB = _priorityMap[b.priorityText] ?? -1;
+          // Selalu urutkan prioritas dari tertinggi ke terendah
+          return priorityB.compareTo(priorityA);
+        case SortType.byDate:
+        default:
+          // Urutkan berdasarkan waktu perubahan terbaru
+          return b.lastChange.compareTo(a.lastChange);
       }
     });
   }
 
-  void togglePrioritySortDirection() {
-    _prioritySortDirection = _prioritySortDirection == SortDirection.asc
-        ? SortDirection.desc
-        : SortDirection.asc;
-    _sortTickets(); 
-    notifyListeners(); 
+  void toggleSort() {
+    // Beralih antara mode pengurutan byDate dan byPriority
+    if (_currentSortType == SortType.byDate) {
+      _currentSortType = SortType.byPriority;
+    } else {
+      _currentSortType = SortType.byDate;
+    }
+    _sortTickets(); // Terapkan pengurutan baru
+    notifyListeners();
   }
 
   Future<void> fetchTickets({
@@ -79,9 +84,20 @@ class TicketProvider with ChangeNotifier {
     try {
       List<Ticket> newTickets;
       if (assignee.isNotEmpty) {
-        newTickets = await _fetchMyTicketsPage(_currentPage, searchQuery, priority, category);
+        newTickets = await _fetchMyTicketsPage(
+          _currentPage,
+          searchQuery,
+          priority,
+          category,
+        );
       } else {
-        newTickets = await _fetchAllTicketsPage(_currentPage, status, category, searchQuery, priority);
+        newTickets = await _fetchAllTicketsPage(
+          _currentPage,
+          status,
+          category,
+          searchQuery,
+          priority,
+        );
       }
 
       if (isRefresh) {
@@ -89,7 +105,7 @@ class TicketProvider with ChangeNotifier {
       } else {
         _tickets.addAll(newTickets);
       }
-      
+
       _sortTickets();
 
       _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
@@ -118,9 +134,20 @@ class TicketProvider with ChangeNotifier {
     try {
       List<Ticket> newTickets;
       if (assignee.isNotEmpty) {
-        newTickets = await _fetchMyTicketsPage(_currentPage, searchQuery, priority, category);
+        newTickets = await _fetchMyTicketsPage(
+          _currentPage,
+          searchQuery,
+          priority,
+          category,
+        );
       } else {
-        newTickets = await _fetchAllTicketsPage(_currentPage, status, category, searchQuery, priority);
+        newTickets = await _fetchAllTicketsPage(
+          _currentPage,
+          status,
+          category,
+          searchQuery,
+          priority,
+        );
       }
 
       _tickets.addAll(newTickets);
@@ -128,42 +155,59 @@ class TicketProvider with ChangeNotifier {
 
       _hasMore = newTickets.length == 10;
     } catch (e) {
-      _currentPage--; 
+      _currentPage--;
     } finally {
       _isLoadingMore = false;
       notifyListeners();
     }
   }
 
-  Future<List<Ticket>> _fetchAllTicketsPage(int page, String status, String category, String searchQuery, String priority) async {
+  Future<List<Ticket>> _fetchAllTicketsPage(
+    int page,
+    String status,
+    String category,
+    String searchQuery,
+    String priority,
+  ) async {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) throw Exception('Token tidak ditemukan');
 
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_tickets.php').replace(queryParameters: {
-      'page': page.toString(),
-      'status': status,
-      'category': category,
-      'q': searchQuery,
-      'priority': priority,
-    });
+    final url = Uri.parse('${ApiConfig.baseUrl}/get_tickets.php').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'status': status,
+        'category': category,
+        'q': searchQuery,
+        'priority': priority,
+      },
+    );
     return _fetchData(url, headers);
   }
 
-  Future<List<Ticket>> _fetchMyTicketsPage(int page, String searchQuery, String priority, String category) async {
+  Future<List<Ticket>> _fetchMyTicketsPage(
+    int page,
+    String searchQuery,
+    String priority,
+    String category,
+  ) async {
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) throw Exception('Token tidak ditemukan');
 
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_my_tickets.php').replace(queryParameters: {
-      'page': page.toString(),
-      'q': searchQuery,
-      'priority': priority,
-      'category': category,
-    });
+    final url = Uri.parse('${ApiConfig.baseUrl}/get_my_tickets.php').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'q': searchQuery,
+        'priority': priority,
+        'category': category,
+      },
+    );
     return _fetchData(url, headers);
   }
 
   Future<List<Ticket>> _fetchData(Uri url, Map<String, String> headers) async {
-    final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 20));
+    final response = await http
+        .get(url, headers: headers)
+        .timeout(const Duration(seconds: 20));
 
     if (response.statusCode == 200) {
       final responseData = json.decode(response.body);
@@ -171,12 +215,16 @@ class TicketProvider with ChangeNotifier {
         final List<dynamic> data = responseData['data'];
         return data.map((json) => Ticket.fromJson(json)).toList();
       } else {
-        throw Exception(responseData['message'] ?? 'Gagal mengambil data tiket');
+        throw Exception(
+          responseData['message'] ?? 'Gagal mengambil data tiket',
+        );
       }
     } else if (response.statusCode == 401) {
       throw Exception('Unauthorized: Sesi Anda mungkin telah berakhir.');
     } else {
-      throw Exception('Gagal terhubung ke server: Status ${response.statusCode}');
+      throw Exception(
+        'Gagal terhubung ke server: Status ${response.statusCode}',
+      );
     }
   }
 
