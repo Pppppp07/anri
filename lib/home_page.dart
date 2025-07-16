@@ -696,6 +696,8 @@ class _HomePageState extends State<HomePage> {
                 children: _statusHeaderFilters.map((status) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
+
+                    // lib/home_page.dart -> di dalam metode _buildHeaderFilterBar
                     child: ChoiceChip(
                       label: Text(status),
                       selected: _selectedStatus == status,
@@ -705,25 +707,48 @@ class _HomePageState extends State<HomePage> {
                           _triggerSearch();
                         }
                       },
+
+                      // --- [AWAL BLOK PERBAIKAN VISUAL] ---
+
+                      // Tampilkan ikon centang pada chip yang aktif untuk kejelasan ekstra.
+                      showCheckmark: true,
+
+                      // Atur warna centang agar kontras dengan latar belakang chip aktif.
+                      checkmarkColor: Theme.of(
+                        context,
+                      ).colorScheme.onPrimaryContainer,
+
+                      // Warna latar untuk chip yang TIDAK AKTIF. Gunakan warna surface yang lebih netral.
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+
+                      // Warna latar untuk chip yang AKTIF. Warna ini sudah cukup baik.
                       selectedColor: Theme.of(
                         context,
                       ).colorScheme.primaryContainer,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
+
+                      // Atur gaya teks label.
                       labelStyle: TextStyle(
                         color: _selectedStatus == status
                             ? Theme.of(context).colorScheme.onPrimaryContainer
                             : Theme.of(context).textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.w500,
                       ),
+
+                      // Pengaturan garis pinggir (border) yang lebih jelas.
                       side: BorderSide(
+                        // Jika chip aktif, beri border warna primary yang tebal.
+                        // Jika tidak aktif, beri border warna abu-abu (outline) yang standar.
                         color: _selectedStatus == status
-                            ? Colors.transparent
+                            ? Theme.of(context).colorScheme.primary
                             : Theme.of(
                                 context,
-                              ).colorScheme.outline.withAlpha(51),
+                              ).colorScheme.outline.withOpacity(0.5),
+
+                        // Atur ketebalan border.
+                        width: 1.0,
                       ),
+
+                      // --- [AKHIR BLOK PERBAIKAN VISUAL] ---
                     ),
                   );
                 }).toList(),
