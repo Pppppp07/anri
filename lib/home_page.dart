@@ -284,7 +284,7 @@ class _HomePageState extends State<HomePage> {
           searchQuery: _searchController.text,
           priority: _selectedPriority,
           assignee: assigneeParam,
-          isRefresh: true,
+          isRefresh: false,
           isBackgroundRefresh: true,
         );
       }
@@ -658,8 +658,8 @@ class _HomePageState extends State<HomePage> {
                       ? 'Urutan diubah berdasarkan Prioritas'
                       : 'Urutan diubah berdasarkan Terbaru';
 
-                  // Ubah state pengurutan
                   ticketProvider.toggleSort();
+                  _triggerSearch();
 
                   // Hapus snackbar lama (jika ada) dan tampilkan yang baru
                   ScaffoldMessenger.of(context)

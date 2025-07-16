@@ -1,5 +1,3 @@
-// lib/providers/ticket_provider.dart
-
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
 import 'package:anri/models/ticket_model.dart';
@@ -19,7 +17,7 @@ class TicketProvider with ChangeNotifier {
   bool _isLoadingMore = false;
   int _currentPage = 1;
 
-  SortType _currentSortType = SortType.byDate;
+  SortType _currentSortType = SortType.byDate; // Default sort
 
   List<Ticket> get tickets => _tickets;
   ListState get listState => _listState;
@@ -28,229 +26,23 @@ class TicketProvider with ChangeNotifier {
   bool get isLoadingMore => _isLoadingMore;
   SortType get currentSortType => _currentSortType;
 
-  final Map<String, int> _priorityMap = {
-    'Low': 0,
-    'Medium': 1,
-    'High': 2,
-    'Critical': 3,
-  };
+  // --- [PERUBAHAN] HAPUS _priorityMap dan _sortTickets() ---
+  // Peta prioritas dan fungsi _sortTickets() tidak lagi diperlukan karena sorting dilakukan oleh server.
 
-  void _sortTickets() {
-    _tickets.sort((a, b) {
-      switch (_currentSortType) {
-        case SortType.byPriority:
-          final priorityA = _priorityMap[a.priorityText] ?? -1;
-          final priorityB = _priorityMap[b.priorityText] ?? -1;
-          // Selalu urutkan prioritas dari tertinggi ke terendah
-          return priorityB.compareTo(priorityA);
-        case SortType.byDate:
-        default:
-          // Urutkan berdasarkan waktu perubahan terbaru
-          return b.lastChange.compareTo(a.lastChange);
-      }
-    });
-  }
-
+  // --- [PERUBAHAN] Ubah toggleSort ---
   void toggleSort() {
-    // Beralih antara mode pengurutan byDate dan byPriority
-    if (_currentSortType == SortType.byDate) {
-      _currentSortType = SortType.byPriority;
-    } else {
-      _currentSortType = SortType.byDate;
-    }
-    _sortTickets(); // Terapkan pengurutan baru
+    // Metode ini sekarang hanya mengubah state dan memberi tahu UI (untuk animasi ikon).
+    // Pengambilan data akan di-handle oleh UI (_triggerSearch di home_page).
+    _currentSortType = (_currentSortType == SortType.byDate)
+        ? SortType.byPriority
+        : SortType.byDate;
     notifyListeners();
   }
 
-  Future<void> fetchTickets({
-    required String status,
-    required String category,
-    required String searchQuery,
-    required String priority,
-    required String assignee,
-    bool isRefresh = false,
-    bool isBackgroundRefresh = false,
-  }) async {
-    // Logika khusus untuk auto-refresh di latar belakang
-    if (isBackgroundRefresh) {
-      try {
-        List<Ticket> refreshedTickets = [];
-        // Ambil kembali semua halaman yang sudah ditampilkan, dari halaman 1 sampai halaman saat ini (_currentPage)
-        for (var i = 1; i <= _currentPage; i++) {
-          List<Ticket> pageData;
-          if (assignee.isNotEmpty) {
-            pageData = await _fetchMyTicketsPage(
-              i,
-              status,
-              searchQuery,
-              priority,
-              category,
-            );
-          } else {
-            pageData = await _fetchAllTicketsPage(
-              i,
-              status,
-              category,
-              searchQuery,
-              priority,
-            );
-          }
-          refreshedTickets.addAll(pageData);
-          // Optimisasi: jika halaman yang diambil datanya kurang dari 10, hentikan loop
-          if (pageData.length < 10) {
-            _hasMore = false;
-            break;
-          }
-        }
-
-        _tickets =
-            refreshedTickets; // Ganti daftar tiket dengan data yang sudah di-refresh sepenuhnya
-        _sortTickets();
-        _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
-        notifyListeners();
-      } catch (e) {
-        debugPrint("Background refresh failed: $e"); // Gagal secara diam-diam
-      }
-      return; // Keluar dari fungsi agar tidak menjalankan logika di bawah
-    }
-
-    // Logika yang digunakan untuk Pull-to-Refresh manual dan Load More
-    if (isRefresh) {
-      _currentPage = 1;
-      _hasMore = true;
-      _listState = ListState.loading;
-      notifyListeners();
-    }
-
-    try {
-      List<Ticket> newTickets;
-      if (assignee.isNotEmpty) {
-        newTickets = await _fetchMyTicketsPage(
-          _currentPage,
-          status,
-          searchQuery,
-          priority,
-          category,
-        );
-      } else {
-        newTickets = await _fetchAllTicketsPage(
-          _currentPage,
-          status,
-          category,
-          searchQuery,
-          priority,
-        );
-      }
-
-      if (isRefresh) {
-        _tickets = newTickets;
-      } else {
-        _tickets.addAll(newTickets);
-      }
-
-      _sortTickets();
-
-      _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
-      _hasMore = newTickets.length == 10;
-    } catch (e) {
-      _errorMessage = e.toString();
-      _listState = ListState.error;
-    } finally {
-      notifyListeners();
-    }
-  }
-
-  Future<void> loadMoreTickets({
-    required String status,
-    required String category,
-    required String searchQuery,
-    required String priority,
-    required String assignee,
-  }) async {
-    if (_isLoadingMore || !_hasMore) return;
-
-    _isLoadingMore = true;
-    notifyListeners();
-    _currentPage++;
-
-    try {
-      List<Ticket> newTickets;
-      if (assignee.isNotEmpty) {
-        // --- LOKASI PERBAIKAN #1 ---
-        // Panggil method dengan 5 argumen, termasuk 'status'
-        newTickets = await _fetchMyTicketsPage(
-          _currentPage,
-          status,
-          searchQuery,
-          priority,
-          category,
-        );
-      } else {
-        newTickets = await _fetchAllTicketsPage(
-          _currentPage,
-          status,
-          category,
-          searchQuery,
-          priority,
-        );
-      }
-
-      _tickets.addAll(newTickets);
-      _sortTickets();
-
-      _hasMore = newTickets.length == 10;
-    } catch (e) {
-      _currentPage--;
-    } finally {
-      _isLoadingMore = false;
-      notifyListeners();
-    }
-  }
-
-  Future<List<Ticket>> _fetchAllTicketsPage(
-    int page,
-    String status,
-    String category,
-    String searchQuery,
-    String priority,
-  ) async {
-    final headers = await _getAuthHeaders();
-    if (headers.isEmpty) throw Exception('Token tidak ditemukan');
-
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_tickets.php').replace(
-      queryParameters: {
-        'page': page.toString(),
-        'status': status,
-        'category': category,
-        'q': searchQuery,
-        'priority': priority,
-      },
-    );
-    return _fetchData(url, headers);
-  }
-
-  // --- LOKASI PERBAIKAN #2 ---
-  // Hapus definisi method duplikat yang lama, hanya sisakan satu definisi ini.
-  Future<List<Ticket>> _fetchMyTicketsPage(
-    int page,
-    String status,
-    String searchQuery,
-    String priority,
-    String category,
-  ) async {
-    final headers = await _getAuthHeaders();
-    if (headers.isEmpty) throw Exception('Token tidak ditemukan');
-
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_my_tickets.php').replace(
-      queryParameters: {
-        'page': page.toString(),
-        'status': status,
-        'q': searchQuery,
-        'priority': priority,
-        'category': category,
-      },
-    );
-    return _fetchData(url, headers);
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('auth_token');
+    return token != null ? {'Authorization': 'Bearer $token'} : {};
   }
 
   Future<List<Ticket>> _fetchData(Uri url, Map<String, String> headers) async {
@@ -277,9 +69,136 @@ class TicketProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, String>> _getAuthHeaders() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('auth_token');
-    return token != null ? {'Authorization': 'Bearer $token'} : {};
+  String _getEndpoint(String assignee) {
+    return assignee.isNotEmpty ? '/get_my_tickets.php' : '/get_tickets.php';
+  }
+
+  // --- [PERUBAHAN] Modifikasi _fetchPage untuk mengirim parameter sort_by ---
+  Future<List<Ticket>> _fetchPage(
+    int page, {
+    required String status,
+    required String category,
+    required String searchQuery,
+    required String priority,
+    required String assignee,
+  }) async {
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty)
+      throw Exception('Token tidak ditemukan atau sesi berakhir.');
+
+    // Tentukan nilai parameter sort_by berdasarkan state saat ini
+    final String sortByParam = _currentSortType == SortType.byPriority
+        ? 'priority'
+        : 'date';
+
+    final endpoint = _getEndpoint(assignee);
+    final url = Uri.parse('${ApiConfig.baseUrl}$endpoint').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'status': status,
+        'category': category,
+        'q': searchQuery,
+        'priority': priority,
+        'sort_by': sortByParam, // <-- KIRIM PARAMETER SORTING KE API
+      },
+    );
+    return _fetchData(url, headers);
+  }
+
+  // --- [PERUBAHAN] Sederhanakan fetchTickets, hapus _sortTickets() ---
+  Future<void> fetchTickets({
+    required String status,
+    required String category,
+    required String searchQuery,
+    required String priority,
+    required String assignee,
+    bool isRefresh = false,
+    bool isBackgroundRefresh = false,
+  }) async {
+    if (isBackgroundRefresh) {
+      try {
+        List<Ticket> refreshedTickets = [];
+        for (var i = 1; i <= _currentPage; i++) {
+          final pageData = await _fetchPage(
+            i,
+            status: status,
+            category: category,
+            searchQuery: searchQuery,
+            priority: priority,
+            assignee: assignee,
+          );
+          refreshedTickets.addAll(pageData);
+          if (pageData.length < 10) {
+            _hasMore = false;
+            break;
+          }
+        }
+        _tickets = refreshedTickets;
+        _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
+        notifyListeners();
+      } catch (e) {
+        debugPrint("Background refresh failed silently: $e");
+      }
+      return;
+    }
+
+    if (isRefresh) {
+      _currentPage = 1;
+      _hasMore = true;
+      _listState = ListState.loading;
+      notifyListeners();
+    }
+
+    try {
+      final newTickets = await _fetchPage(
+        _currentPage,
+        status: status,
+        category: category,
+        searchQuery: searchQuery,
+        priority: priority,
+        assignee: assignee,
+      );
+      _tickets = newTickets;
+      _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
+      _hasMore = newTickets.length >= 10;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _listState = ListState.error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  // --- [PERUBAHAN] Sederhanakan loadMoreTickets, hapus _sortTickets() ---
+  Future<void> loadMoreTickets({
+    required String status,
+    required String category,
+    required String searchQuery,
+    required String priority,
+    required String assignee,
+  }) async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+    _currentPage++;
+
+    try {
+      final newTickets = await _fetchPage(
+        _currentPage,
+        status: status,
+        category: category,
+        searchQuery: searchQuery,
+        priority: priority,
+        assignee: assignee,
+      );
+      _tickets.addAll(newTickets);
+      _hasMore = newTickets.length >= 10;
+    } catch (e) {
+      _currentPage--;
+    } finally {
+      _isLoadingMore = false;
+      notifyListeners();
+    }
   }
 }
