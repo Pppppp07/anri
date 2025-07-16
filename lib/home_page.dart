@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
-// import 'package:anri/models/ticket_model.dart'; // Import ini mungkin tidak lagi digunakan di file ini, bisa dihapus jika linter masih menampilkannya
 import 'package:anri/pages/error_page.dart';
 import 'package:anri/pages/home/widgets/ticket_card.dart';
 import 'package:anri/pages/login_page.dart';
