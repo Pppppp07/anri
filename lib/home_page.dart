@@ -1,12 +1,11 @@
-// lib/home_page.dart
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
-import 'package:anri/models/ticket_model.dart';
+// import 'package:anri/models/ticket_model.dart'; // Import ini mungkin tidak lagi digunakan di file ini, bisa dihapus jika linter masih menampilkannya
 import 'package:anri/pages/error_page.dart';
 import 'package:anri/pages/home/widgets/ticket_card.dart';
 import 'package:anri/pages/login_page.dart';
+import 'package:anri/pages/notification_page.dart';
 import 'package:anri/pages/profile_page.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
@@ -16,7 +15,6 @@ import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:anri/pages/notification_page.dart';
 
 enum TicketView { all, assignedToMe }
 
@@ -38,9 +36,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  String _selectedCategory = 'All';
-  String _selectedStatus = 'New';
-  String _selectedPriority = 'All';
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounce;
@@ -50,6 +45,12 @@ class _HomePageState extends State<HomePage> {
   final ScrollController _scrollController = ScrollController();
   TicketView _currentView = TicketView.all;
   FabState _fabState = FabState.hidden;
+
+  String _selectedStatus = 'New';
+  String _homeCategory = 'All';
+  String _homePriority = 'All';
+  String _historyCategory = 'All';
+  String _historyPriority = 'All';
 
   final Map<String, String> _categories = {
     'All': 'Semua Kategori',
@@ -83,7 +84,6 @@ class _HomePageState extends State<HomePage> {
     'In Progress',
     'On Hold',
   ];
-
   final List<String> _priorityDialogFilters = [
     'All',
     'Critical',
@@ -102,32 +102,30 @@ class _HomePageState extends State<HomePage> {
     });
 
     _searchController.addListener(() {
-      if (_debounce?.isActive ?? false) _debounce!.cancel();
+      if (_debounce?.isActive ?? false) {
+        _debounce!.cancel();
+      }
       _debounce = Timer(const Duration(milliseconds: 500), _triggerSearch);
     });
 
     _scrollController.addListener(() {
-      if (!_scrollController.hasClients) return;
-
+      if (!_scrollController.hasClients) {
+        return;
+      }
       final direction = _scrollController.position.userScrollDirection;
       final offset = _scrollController.position.pixels;
 
-      // Sembunyikan FAB jika sudah berada di paling atas
       if (offset < 200) {
         if (_fabState != FabState.hidden) {
           setState(() => _fabState = FabState.hidden);
         }
         return;
       }
-
-      // Jika scroll ke bawah, ubah FAB menjadi mode Filter
       if (direction == ScrollDirection.reverse) {
         if (_fabState != FabState.filter) {
           setState(() => _fabState = FabState.filter);
         }
-      }
-      // Jika scroll ke atas, ubah FAB menjadi mode Scroll to Top
-      else if (direction == ScrollDirection.forward) {
+      } else if (direction == ScrollDirection.forward) {
         if (_fabState != FabState.scrollToTop) {
           setState(() => _fabState = FabState.scrollToTop);
         }
@@ -149,29 +147,25 @@ class _HomePageState extends State<HomePage> {
     final String assigneeParam = _currentView == TicketView.assignedToMe
         ? widget.currentUserName
         : '';
+    final bool isHomePage = _selectedIndex == 0;
 
     context.read<TicketProvider>().fetchTickets(
       status: _getStatusForAPI(),
-      category: _selectedCategory,
+      category: isHomePage ? _homeCategory : _historyCategory,
       searchQuery: _searchController.text,
-      priority: _selectedPriority,
+      priority: isHomePage ? _homePriority : _historyPriority,
       assignee: assigneeParam,
       isRefresh: true,
     );
   }
 
   String _getStatusForAPI() {
-    // Prioritas #1: Jika di halaman Riwayat (index 1), selalu tampilkan yang 'Resolved'.
     if (_selectedIndex == 1) {
       return 'Resolved';
     }
-
-    // Prioritas #2: Jika di Beranda (index 0) DAN tab 'Untuk Saya', tampilkan tiket 'Active'.
     if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe) {
       return 'Active';
     }
-
-    // Logika fallback untuk Beranda -> Semua Tiket
     if (_selectedStatus == 'Semua Status') {
       return 'All';
     }
@@ -182,8 +176,9 @@ class _HomePageState extends State<HomePage> {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('auth_token');
     if (token == null) {
-      // PERBAIKAN: use_build_context_synchronously
-      // Tambahkan pengecekan mounted sebelum menggunakan context.
+      // --- [PERBAIKAN] use_build_context_synchronously ---
+      // Karena ini bukan method async, pemanggilan _logout aman.
+      // Namun kita akan pastikan _logout juga aman.
       if (mounted) {
         _logout(context, message: 'Sesi tidak valid. Silakan login kembali.');
       }
@@ -194,17 +189,23 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchTeamMembers() async {
     final headers = await _getAuthHeaders();
-    if (headers.isEmpty || !mounted) return;
+    if (!mounted) {
+      return;
+    }
+    if (headers.isEmpty) {
+      return;
+    }
     try {
       final url = Uri.parse('${ApiConfig.baseUrl}/get_users.php');
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
 
-      // PERBAIKAN: use_build_context_synchronously
-      // Pindahkan pengecekan `mounted` setelah `await`
-      if (!mounted) return;
-
+      // --- [PERBAIKAN] use_build_context_synchronously ---
+      // Selalu cek 'mounted' setelah 'await' sebelum menggunakan BuildContext.
+      if (!mounted) {
+        return;
+      }
       if (response.statusCode == 401) {
         _logout(context, message: 'Sesi tidak valid.');
         return;
@@ -216,11 +217,11 @@ class _HomePageState extends State<HomePage> {
           final List<String> fetchedMembers = data
               .map((user) => user['name'].toString())
               .toList();
-          setState(() {
-            _teamMembers = fetchedMembers.isNotEmpty
+          setState(
+            () => _teamMembers = fetchedMembers.isNotEmpty
                 ? fetchedMembers
-                : ['Unassigned'];
-          });
+                : ['Unassigned'],
+          );
         }
       }
     } catch (e) {
@@ -240,8 +241,10 @@ class _HomePageState extends State<HomePage> {
       await prefs.setString('user_username', username);
     }
 
-    if (!mounted) return;
-
+    // --- [PERBAIKAN] use_build_context_synchronously ---
+    if (!mounted) {
+      return;
+    }
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -256,34 +259,34 @@ class _HomePageState extends State<HomePage> {
 
   void _startAutoRefreshTimer() {
     _autoRefreshTimer?.cancel();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final settingsProvider = context.read<SettingsProvider>();
-
     if (settingsProvider.refreshInterval == Duration.zero) {
       debugPrint("Auto refresh is OFF");
       return;
     }
-
-    debugPrint(
-      "Starting auto refresh timer with interval: ${settingsProvider.refreshIntervalText}",
-    );
     _autoRefreshTimer = Timer.periodic(settingsProvider.refreshInterval, (
       timer,
     ) {
-      if (_selectedIndex != 2 &&
+      final bool shouldRefresh =
+          _selectedIndex != 2 &&
           _searchController.text.isEmpty &&
           mounted &&
           context.read<TicketProvider>().listState != ListState.loading &&
-          !context.read<TicketProvider>().isLoadingMore) {
-        debugPrint("Auto refreshing tickets (background)...");
+          !context.read<TicketProvider>().isLoadingMore;
+
+      if (shouldRefresh) {
         final String assigneeParam = _currentView == TicketView.assignedToMe
             ? widget.currentUserName
             : '';
+        final bool isHomePage = _selectedIndex == 0;
         context.read<TicketProvider>().fetchTickets(
           status: _getStatusForAPI(),
-          category: _selectedCategory,
+          category: isHomePage ? _homeCategory : _historyCategory,
           searchQuery: _searchController.text,
-          priority: _selectedPriority,
+          priority: isHomePage ? _homePriority : _historyPriority,
           assignee: assigneeParam,
           isRefresh: false,
           isBackgroundRefresh: true,
@@ -325,13 +328,11 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     final pageBackgroundDecoration = BoxDecoration(
       gradient: LinearGradient(
         colors: isDarkMode
             ? [
                 Theme.of(context).colorScheme.surface,
-                // PERBAIKAN: deprecated_member_use. Menggunakan scaffoldBackgroundColor sebagai pengganti
                 Theme.of(context).scaffoldBackgroundColor,
               ]
             : [
@@ -344,30 +345,22 @@ class _HomePageState extends State<HomePage> {
         end: Alignment.bottomCenter,
       ),
     );
-
     return Scaffold(
-      // Tambahkan kondisi untuk menampilkan AppBar hanya jika bukan tab Profil
       appBar: _selectedIndex != 2
           ? AppBar(
               title: _buildAppBarTitle(),
               actions: _selectedIndex == 0
                   ? [
-                      // --- [AWAL PERUBAHAN] ---
                       IconButton(
                         icon: const Icon(Icons.notifications_none_outlined),
                         tooltip: 'Notifikasi',
-                        onPressed: () {
-                          // Navigasi ke halaman notifikasi ketika di-klik
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const NotificationPage(),
-                            ),
-                          );
-                        },
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const NotificationPage(),
+                          ),
+                        ),
                       ),
-
-                      // --- [AKHIR PERUBAHAN] ---
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.only(right: 16.0),
@@ -383,7 +376,6 @@ class _HomePageState extends State<HomePage> {
           : null,
       body: Stack(
         children: [
-          // Hanya tampilkan background gradien jika bukan tab Profil
           if (_selectedIndex != 2)
             Container(decoration: pageBackgroundDecoration),
           _buildBody(),
@@ -391,22 +383,19 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
-        transitionBuilder: (child, animation) {
-          return ScaleTransition(scale: animation, child: child);
-        },
+        transitionBuilder: (child, animation) =>
+            ScaleTransition(scale: animation, child: child),
         child: _buildFab(),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
           if (_selectedIndex != index) {
-            _searchController.clear();
             setState(() {
               _selectedIndex = index;
-              _selectedCategory = 'All';
-              _selectedStatus = 'New';
               _currentView = TicketView.all;
-              _fabState = FabState.hidden; // Ganti _isHeaderVisible dengan ini
+              _fabState = FabState.hidden;
+              _searchController.clear();
             });
             if (index != 2) {
               _triggerSearch();
@@ -451,35 +440,28 @@ class _HomePageState extends State<HomePage> {
       case FabState.scrollToTop:
         return FloatingActionButton(
           key: const ValueKey('scrollToTop'),
-          onPressed: () {
-            _scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          },
+          onPressed: () => _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          ),
           tooltip: 'Kembali ke Atas',
-          // Tambahkan properti warna di sini agar sama
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Theme.of(context).colorScheme.onPrimary,
           child: const Icon(Icons.arrow_upward),
         );
+      // --- [PERBAIKAN] Menghapus 'default' yang redudan ---
       case FabState.hidden:
-      default:
-        // Kembalikan widget kosong agar animasi berjalan mulus
         return const SizedBox.shrink(key: ValueKey('hidden'));
     }
   }
 
   Widget _buildBody() {
-    // Tentukan widget body berdasarkan _selectedIndex
     switch (_selectedIndex) {
       case 0:
       case 1:
-        // Gunakan CustomScrollView untuk membuat semua elemen bisa scroll
         return RefreshIndicator(
           onRefresh: () async {
-            // Header dianggap tersembunyi jika FAB sedang tidak dalam state 'hidden'
             if (_fabState != FabState.hidden) {
               await _scrollController.animateTo(
                 0,
@@ -492,9 +474,7 @@ class _HomePageState extends State<HomePage> {
           child: CustomScrollView(
             controller: _scrollController,
             slivers: [
-              // 1. Header sebagai Sliver. Header akan ikut scroll dan menghilang.
               SliverToBoxAdapter(child: _buildHeaderFilterBar()),
-              // 2. Consumer untuk daftar tiket, sekarang menggunakan SliverList
               Consumer<TicketProvider>(
                 builder: (context, provider, child) {
                   switch (provider.listState) {
@@ -512,14 +492,12 @@ class _HomePageState extends State<HomePage> {
                         child: _buildEmptyState(),
                       );
                     case ListState.hasData:
-                      // Gunakan SliverList untuk menampilkan daftar tiket
                       return SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             if (index < provider.tickets.length) {
                               final ticket = provider.tickets[index];
                               return TicketCard(
-                                // TAMBAHKAN KEY UNIK DI SINI
                                 key: ValueKey(ticket.id),
                                 ticket: ticket,
                                 allCategories: _categories.entries
@@ -531,7 +509,6 @@ class _HomePageState extends State<HomePage> {
                                 onRefresh: _triggerSearch,
                               );
                             } else {
-                              // Tampilkan tombol "load more" di akhir list
                               return _buildPaginationControl(provider);
                             }
                           },
@@ -582,36 +559,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHeaderFilterBar() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final ticketProvider = context.watch<TicketProvider>();
-
-    // PERBAIKAN: deprecated_member_use. Mengganti MaterialState dengan WidgetState.
     final ButtonStyle segmentedButtonStyle = ButtonStyle(
-      backgroundColor: WidgetStateProperty.resolveWith<Color?>((
-        Set<WidgetState> states,
-      ) {
-        if (states.contains(WidgetState.selected)) {
-          return Theme.of(context).colorScheme.primary;
-        }
-        return isDarkMode
-            ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : Colors.white;
-      }),
-      foregroundColor: WidgetStateProperty.resolveWith<Color?>((
-        Set<WidgetState> states,
-      ) {
-        if (states.contains(WidgetState.selected)) {
-          return Theme.of(context).colorScheme.onPrimary;
-        }
-        return Theme.of(context).colorScheme.primary;
-      }),
+      backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+        (states) => states.contains(WidgetState.selected)
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith<Color?>(
+        (states) => states.contains(WidgetState.selected)
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.primary,
+      ),
       side: WidgetStateProperty.all(
-        BorderSide(
-          // PERBAIKAN: deprecated_member_use. Menggunakan withAlpha sebagai pengganti withOpacity.
-          color: Theme.of(
-            context,
-          ).colorScheme.primary.withAlpha((255 * 0.5).round()),
-        ),
+        BorderSide(color: Theme.of(context).colorScheme.primary.withAlpha(128)),
       ),
       shape: WidgetStateProperty.all(
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
@@ -664,33 +625,22 @@ class _HomePageState extends State<HomePage> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                // --- UBAH BAGIAN ONPRESSED INI ---
                 onPressed: () {
-                  // Ambil provider-nya terlebih dahulu
-                  final ticketProvider = context.read<TicketProvider>();
-
-                  // Tentukan pesan yang akan tampil berdasarkan state saat ini
                   final message =
                       ticketProvider.currentSortType == SortType.byDate
                       ? 'Urutan diubah berdasarkan Prioritas'
                       : 'Urutan diubah berdasarkan Terbaru';
-
                   ticketProvider.toggleSort();
                   _triggerSearch();
-
-                  // Hapus snackbar lama (jika ada) dan tampilkan yang baru
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
                       SnackBar(
                         content: Text(message),
-                        duration: const Duration(
-                          seconds: 2,
-                        ), // Tampil selama 2 detik
+                        duration: const Duration(seconds: 2),
                       ),
                     );
                 },
-                // ---------------------------------
                 tooltip: ticketProvider.currentSortType == SortType.byDate
                     ? 'Urutkan berdasarkan Prioritas'
                     : 'Urutkan berdasarkan Terbaru',
@@ -707,9 +657,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             child: SegmentedButton<TicketView>(
@@ -727,15 +675,12 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
               selected: {_currentView},
-              onSelectionChanged: (Set<TicketView> newSelection) {
-                setState(() {
-                  _currentView = newSelection.first;
-                });
+              onSelectionChanged: (newSelection) {
+                setState(() => _currentView = newSelection.first);
                 _triggerSearch();
               },
             ),
           ),
-
           if (_selectedIndex == 0 && _currentView == TicketView.all) ...[
             const SizedBox(height: 16),
             Text(
@@ -776,10 +721,9 @@ class _HomePageState extends State<HomePage> {
                       side: BorderSide(
                         color: _selectedStatus == status
                             ? Colors.transparent
-                            // PERBAIKAN: deprecated_member_use. Menggunakan withAlpha sebagai pengganti withOpacity.
-                            : Theme.of(context).colorScheme.outline.withAlpha(
-                                (255 * 0.2).round(),
-                              ),
+                            : Theme.of(
+                                context,
+                              ).colorScheme.outline.withAlpha(51),
                       ),
                     ),
                   );
@@ -794,10 +738,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showFilterDialog() {
-    String tempCategory = _selectedCategory;
+    final bool isHomePage = _selectedIndex == 0;
+    String tempCategory = isHomePage ? _homeCategory : _historyCategory;
     String tempStatus = _selectedStatus;
-    String tempPriority = _selectedPriority;
-
+    String tempPriority = isHomePage ? _homePriority : _historyPriority;
     Color getStatusColor(String status) {
       switch (status) {
         case 'New':
@@ -833,7 +777,7 @@ class _HomePageState extends State<HomePage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_selectedIndex == 0) ...[
+                    if (isHomePage) ...[
                       Text(
                         'Status',
                         style: Theme.of(context).textTheme.bodySmall,
@@ -880,9 +824,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                       items: _priorityDialogFilters.map((priority) {
                         if (priority == 'All') {
-                          return DropdownMenuItem<String>(
-                            value: priority,
-                            child: const Text('Semua Prioritas'),
+                          return const DropdownMenuItem<String>(
+                            value: 'All',
+                            child: Text('Semua Prioritas'),
                           );
                         }
                         return DropdownMenuItem<String>(
@@ -955,9 +899,14 @@ class _HomePageState extends State<HomePage> {
                       onPressed: () {
                         Navigator.of(context).pop();
                         setState(() {
-                          _selectedCategory = tempCategory;
-                          _selectedStatus = tempStatus;
-                          _selectedPriority = tempPriority;
+                          if (isHomePage) {
+                            _homeCategory = tempCategory;
+                            _homePriority = tempPriority;
+                            _selectedStatus = tempStatus;
+                          } else {
+                            _historyCategory = tempCategory;
+                            _historyPriority = tempPriority;
+                          }
                         });
                         _triggerSearch();
                       },
@@ -968,12 +917,8 @@ class _HomePageState extends State<HomePage> {
                     OutlinedButton(
                       onPressed: () {
                         setDialogState(() {
-                          if (_selectedIndex == 0) {
-                            final bool isHeaderFilterActive =
-                                _statusHeaderFilters.contains(_selectedStatus);
-                            tempStatus = isHeaderFilterActive
-                                ? _selectedStatus
-                                : 'New';
+                          if (isHomePage) {
+                            tempStatus = 'New';
                           }
                           tempPriority = 'All';
                           tempCategory = 'All';
@@ -1072,17 +1017,15 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 12),
             TextButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ErrorPage(
-                      message: errorInfo.userMessage,
-                      referenceCode: errorInfo.referenceCode,
-                    ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ErrorPage(
+                    message: errorInfo.userMessage,
+                    referenceCode: errorInfo.referenceCode,
                   ),
-                );
-              },
+                ),
+              ),
               icon: const Icon(Icons.info_outline),
               label: const Text('Lihat Detail Error'),
               style: TextButton.styleFrom(
@@ -1110,11 +1053,12 @@ class _HomePageState extends State<HomePage> {
             final String assigneeParam = _currentView == TicketView.assignedToMe
                 ? widget.currentUserName
                 : '';
+            final bool isHomePage = _selectedIndex == 0;
             context.read<TicketProvider>().loadMoreTickets(
               status: _getStatusForAPI(),
-              category: _selectedCategory,
+              category: isHomePage ? _homeCategory : _historyCategory,
               searchQuery: _searchController.text,
-              priority: _selectedPriority,
+              priority: isHomePage ? _homePriority : _historyPriority,
               assignee: assigneeParam,
             );
           },
