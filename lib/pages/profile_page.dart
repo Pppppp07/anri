@@ -79,7 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
         return AlertDialog(
           title: const Text('Tentang Aplikasi'),
           content: const Text(
-            'Aplikasi Helpdesk ANRI\nVersi 1.0.0\n\nDibuat untuk memudahkan pelaporan dan penanganan tiket di lingkungan Arsip Nasional Republik Indonesia.',
+            'Aplikasi Helpdesk ANRI\nVersi 1.0.0\n\nDibuat untuk memudahkan penanganan dan tindak lanjut laporan di lingkungan Arsip Nasional Republik Indonesia.',
           ),
           actions: <Widget>[
             TextButton(

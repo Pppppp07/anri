@@ -16,6 +16,7 @@ import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/pages/notification_page.dart';
 
 enum TicketView { all, assignedToMe }
 
@@ -351,6 +352,22 @@ class _HomePageState extends State<HomePage> {
               title: _buildAppBarTitle(),
               actions: _selectedIndex == 0
                   ? [
+                      // --- [AWAL PERUBAHAN] ---
+                      IconButton(
+                        icon: const Icon(Icons.notifications_none_outlined),
+                        tooltip: 'Notifikasi',
+                        onPressed: () {
+                          // Navigasi ke halaman notifikasi ketika di-klik
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationPage(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // --- [AKHIR PERUBAHAN] ---
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.only(right: 16.0),
