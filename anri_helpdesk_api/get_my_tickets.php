@@ -15,11 +15,8 @@ try {
     $limit = 10;
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
     $offset = ($page - 1) * $limit;
-
-    // --- [AWAL PERUBAHAN] ---
-    $sort_by = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'date'; // Ambil parameter sort
-    // --- [AKHIR PERUBAHAN] ---
-
+    
+    $sort_by = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'date';
     $search_query = isset($_GET['q']) ? trim($_GET['q']) : '';
     $priority_filter_text = isset($_GET['priority']) ? trim($_GET['priority']) : 'All';
     $category_filter = isset($_GET['category']) ? trim($_GET['category']) : 'All';
@@ -31,10 +28,12 @@ try {
     $params = [];
     $types = '';
 
-    // ... (SEMUA BLOK 'if' UNTUK FILTER TETAP SAMA) ...
+    // Filter berdasarkan ID pengguna yang sedang login
     $conditions[] = "t.owner = ?";
     $params[] = $current_user_id;
     $types .= 'i';
+
+    // Filter lainnya
     if ($priority_filter_text != 'All') {
         $priority_map = ['Critical' => 0, 'High' => 1, 'Medium' => 2, 'Low' => 3];
         if (array_key_exists($priority_filter_text, $priority_map)) {
@@ -50,46 +49,54 @@ try {
     }
     if ($status_filter_text == 'Active') {
         $conditions[] = "t.status != ?";
-        $params[] = 3; 
+        $params[] = 3;
         $types .= 'i';
     } elseif ($status_filter_text == 'Resolved') {
         $conditions[] = "t.status = ?";
         $params[] = 3;
         $types .= 'i';
     }
+
+    // --- [AWAL BLOK PERBAIKAN] ---
+    // Logika pencarian yang disamakan dengan get_tickets.php
     if (!empty($search_query)) {
         $search_param = "%" . $search_query . "%";
-        $conditions[] = "(t.subject LIKE ? OR t.trackid LIKE ?)";
-        array_push($params, $search_param, $search_param);
-        $types .= 'ss';
+        // Menambahkan pencarian berdasarkan nama requester (t.name)
+        $conditions[] = "(t.subject LIKE ? OR t.trackid LIKE ? OR t.name LIKE ?)";
+        // Tambahkan parameter ketiga untuk t.name
+        array_push($params, $search_param, $search_param, $search_param);
+        // Tambahkan tipe 's' ketiga untuk string
+        $types .= 'sss';
     }
+    // --- [AKHIR BLOK PERBAIKAN] ---
 
     if (!empty($conditions)) { $sql .= " WHERE " . implode(" AND ", $conditions); }
     
-    // --- [AWAL PERUBAHAN] ---
-    // Tentukan klausa ORDER BY secara dinamis
     if ($sort_by === 'priority') {
         $sql .= " ORDER BY t.priority ASC, t.lastchange DESC";
     } else {
         $sql .= " ORDER BY t.lastchange DESC";
     }
-    // --- [AKHIR PERUBAHAN] ---
     
     $sql .= " LIMIT ? OFFSET ?";
     array_push($params, $limit, $offset);
     $types .= 'ii';
 
     $stmt = mysqli_prepare($conn, $sql);
-    if ($stmt === false) { throw new Exception('Query SQL Error: ' . mysqli_error($conn)); }
-    if (!empty($params)) { mysqli_stmt_bind_param($stmt, $types, ...$params); }
+    if ($stmt === false) {
+        throw new Exception('Query SQL Error: ' . mysqli_error($conn));
+    }
+    if (!empty($params)) {
+        mysqli_stmt_bind_param($stmt, $types, ...$params);
+    }
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
 
     $tickets = [];
-    // ... (SISA DARI KODE WHILE LOOP UNTUK MEMPROSES DATA TETAP SAMA) ...
     while ($row = mysqli_fetch_assoc($result)) {
         $status_map = [0 => 'New', 1 => 'Waiting Reply', 2 => 'Replied', 3 => 'Resolved', 4 => 'In Progress', 5 => 'On Hold'];
         $priority_map_rev = [0 => 'Critical', 1 => 'High', 2 => 'Medium', 3 => 'Low'];
+
         $row['owner_name'] = $row['owner_name'] ?? 'Unassigned';
         $row['subject'] = html_entity_decode($row['subject'] ?? '', ENT_QUOTES, 'UTF-8');
         $row['requester_name'] = html_entity_decode($row['requester_name'] ?? '', ENT_QUOTES, 'UTF-8');
