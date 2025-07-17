@@ -69,7 +69,7 @@ Future<void> main() async {
       ),
     );
   };
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -119,7 +119,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-        
+
         // --- [AWAL PERUBAHAN ADA DI SINI] ---
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: const Color.fromARGB(255, 29, 40, 52),
