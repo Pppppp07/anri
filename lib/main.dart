@@ -1,12 +1,12 @@
 // GANTIKAN SELURUH ISI FILE anri_helpdesk-main/lib/main.dart ANDA DENGAN KODE INI
 
+import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:anri/pages/splash_screen.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
