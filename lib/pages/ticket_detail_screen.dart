@@ -2,12 +2,14 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:anri/config/api_config.dart';
 import 'package:anri/models/reply_models.dart';
 import 'package:anri/models/ticket_model.dart';
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/pages/ticket_detail/widgets/reply_history_tab_view.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
@@ -51,16 +53,29 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   bool _isSubmittingReply = false;
   bool _isLoadingDetails = true;
   List<Reply> _replies = [];
+  List<File> _pickedFiles = [];
   Timer? _stopwatchTimer;
   bool _isStopwatchRunning = false;
   late Duration _workedDuration;
 
+  Timer? _refreshTimer;
+
   final List<String> _statusOptions = [
-    'New', 'Waiting Reply', 'Replied', 'In Progress', 'On Hold', 'Resolved',
+    'New',
+    'Waiting Reply',
+    'Replied',
+    'In Progress',
+    'On Hold',
+    'Resolved',
   ];
   final List<String> _priorityOptions = ['Critical', 'High', 'Medium', 'Low'];
   final List<String> _submitAsOptions = [
-    'Replied', 'In Progress', 'On Hold', 'Waiting Reply', 'Resolved', 'New',
+    'Replied',
+    'In Progress',
+    'On Hold',
+    'Waiting Reply',
+    'Resolved',
+    'New',
   ];
 
   @override
@@ -70,6 +85,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     _currentTicket = widget.ticket;
     _initializeState();
     _refreshTicketData();
+    _startAutoRefresh();
   }
 
   void _initializeState() {
@@ -87,7 +103,57 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     _tabController.dispose();
     _replyMessageController.dispose();
     _stopwatchTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted && !_isSaving && !_isSubmittingReply) {
+        _checkForUpdates();
+      }
+    });
+  }
+
+  Future<void> _checkForUpdates() async {
+    if (!mounted) return;
+
+    try {
+      final headers = await _getAuthHeaders();
+      if (headers.isEmpty) return;
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 4));
+
+      if (!mounted || response.statusCode != 200) return;
+
+      final data = json.decode(response.body);
+      if (data['success'] == true && data['replies'] != null) {
+        final List<dynamic> newRepliesData = data['replies'];
+        
+        // --- PERBAIKAN UTAMA DI SINI ---
+        // Cek jika jumlah balasan BERBEDA (bisa bertambah atau berkurang)
+        if (newRepliesData.length != _replies.length) {
+          print('Perubahan riwayat balasan terdeteksi! Memperbarui tampilan...');
+          
+          final List<Attachment> attachments = (data['attachments'] as List)
+              .map((attJson) => Attachment.fromJson(attJson))
+              .toList();
+          final newTicketData = Ticket.fromJson(data['ticket_details'], attachments: attachments);
+          
+          setState(() {
+            _currentTicket = newTicketData;
+            _replies = newRepliesData.map((data) => Reply.fromJson(data)).toList();
+            _initializeState(); 
+          });
+        }
+      }
+    } catch (e) {
+      print('Auto-refresh gagal secara diam-diam: $e');
+    }
   }
 
   Duration _parseDuration(String time) {
@@ -129,7 +195,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       await prefs.setBool('rememberMe', true);
       await prefs.setString('user_username', username);
     }
-    
+
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -155,7 +221,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     );
 
     try {
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 15));
       if (!mounted) return;
 
       if (response.statusCode == 401) {
@@ -170,7 +238,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               .map((attJson) => Attachment.fromJson(attJson))
               .toList();
 
-          final newTicketData = Ticket.fromJson(data['ticket_details'], attachments: attachments);
+          final newTicketData = Ticket.fromJson(
+            data['ticket_details'],
+            attachments: attachments,
+          );
           final repliesData = data['replies'] as List;
 
           setState(() {
@@ -182,11 +253,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           throw Exception(data['message'] ?? 'Gagal memuat detail dari API.');
         }
       } else {
-         throw Exception('Gagal terhubung ke server (Kode: ${response.statusCode})');
+        throw Exception(
+          'Gagal terhubung ke server (Kode: ${response.statusCode})',
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saat refresh: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saat refresh: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoadingDetails = false);
@@ -241,15 +316,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       if (mounted) setState(() => _isSaving = false);
     }
   }
-  
+
   Future<void> _submitReply() async {
-    if (_replyMessageController.text.trim().isEmpty) {
+    if (_replyMessageController.text.trim().isEmpty && _pickedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pesan balasan tidak boleh kosong.'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Pesan balasan atau lampiran tidak boleh kosong.'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
     setState(() => _isSubmittingReply = true);
+
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) {
       setState(() => _isSubmittingReply = false);
@@ -258,27 +337,49 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     final prefs = await SharedPreferences.getInstance();
     final int staffId = prefs.getInt('user_id') ?? 1;
 
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/add_reply.php'),
-        headers: headers,
-        body: {
-          'ticket_id': _currentTicket.id.toString(),
-          'message': _replyMessageController.text,
-          'new_status': _submitAsAction,
-          'staff_id': staffId.toString(),
-          'staff_name': widget.currentUserName,
-        },
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiConfig.baseUrl}/add_reply.php'),
+    );
+    request.headers.addAll(headers);
+
+    request.fields.addAll({
+      'ticket_id': _currentTicket.id.toString(),
+      'message': _replyMessageController.text,
+      'new_status': _submitAsAction,
+      'staff_id': staffId.toString(),
+      'staff_name': widget.currentUserName,
+    });
+
+    for (var file in _pickedFiles) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'attachments[]',
+          file.path,
+        ),
       );
+    }
+
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
       if (!mounted) return;
+
       final data = json.decode(response.body);
       if (data['success'] == true) {
-        setState(() => _hasChanges = true);
+        setState(() {
+          _hasChanges = true;
+          _pickedFiles.clear();
+        });
         _replyMessageController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Balasan berhasil dikirim!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Balasan berhasil dikirim!'),
+            backgroundColor: Colors.green,
+          ),
         );
-        await _refreshTicketData(); 
+        await _refreshTicketData();
       } else {
         throw Exception(data['message'] ?? 'Gagal mengirim balasan.');
       }
@@ -316,14 +417,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     _saveChanges();
   }
 
-  // --- PERUBAHAN: Menambahkan dialog konfirmasi ---
   Future<void> _markAsResolved() async {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Konfirmasi Penyelesaian Tiket'),
-          content: const Text('Apakah Anda yakin ingin menandai tiket ini sebagai "Resolved"?'),
+          content: const Text(
+            'Apakah Anda yakin ingin menandai tiket ini sebagai "Resolved"?',
+          ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -361,7 +463,26 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       }
     }
   }
-  
+
+  Future<void> _pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.any,
+    );
+
+    if (result != null) {
+      setState(() {
+        _pickedFiles.addAll(result.paths.map((path) => File(path!)).toList());
+      });
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _pickedFiles.removeAt(index);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -414,7 +535,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              _buildDetailTabContent(), 
+              _buildDetailTabContent(),
               ReplyHistoryTabView(
                 isLoadingDetails: _isLoadingDetails,
                 replies: _replies,
@@ -432,7 +553,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     if (_isLoadingDetails) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -483,73 +604,116 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
 
     return _buildTitledCard(
-        icon: Icons.attach_file,
-        title: "Lampiran (${_currentTicket.attachments.length})",
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _currentTicket.attachments.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 8), 
-          itemBuilder: (context, index) {
-            final attachment = _currentTicket.attachments[index];
-            final name = attachment.realName.toLowerCase();
-            final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].any((ext) => name.endsWith(ext));
-            final isPdf = name.endsWith('.pdf');
+      icon: Icons.attach_file,
+      title: "Lampiran (${_currentTicket.attachments.length})",
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _currentTicket.attachments.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final attachment = _currentTicket.attachments[index];
+          final name = attachment.realName.toLowerCase();
+          final isImage = [
+            '.jpg',
+            '.jpeg',
+            '.png',
+            '.gif',
+            '.bmp',
+            '.webp',
+          ].any((ext) => name.endsWith(ext));
+          final isPdf = name.endsWith('.pdf');
 
-            void handleTap() {
-              if (isImage || isPdf) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AttachmentViewerPage(attachment: attachment),
-                  ),
-                );
-              } else {
-                _launchAttachmentUrl(attachment.url);
-              }
-            }
-
-            if (isImage) {
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: handleTap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Image.network(
-                        attachment.url, fit: BoxFit.cover, height: 150, width: double.infinity,
-                        loadingBuilder: (context, child, progress) => progress == null ? child : const SizedBox(height: 150, child: Center(child: CircularProgressIndicator())),
-                        errorBuilder: (context, error, stack) => const SizedBox(height: 150, child: Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 40))),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Text(attachment.realName, style: const TextStyle(fontWeight: FontWeight.w500)),
-                      ),
-                    ],
-                  ),
+          void handleTap() {
+            if (isImage || isPdf) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AttachmentViewerPage(attachment: attachment),
                 ),
               );
             } else {
-              return Card(
-                child: ListTile(
-                  leading: Icon(isPdf ? Icons.picture_as_pdf_outlined : Icons.description_outlined),
-                  title: Text(attachment.realName, style: const TextStyle(fontSize: 14)),
-                  subtitle: Text(formatBytes(attachment.size, 2)),
-                  trailing: const Icon(Icons.open_in_new),
-                  onTap: handleTap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
+              _launchAttachmentUrl(attachment.url);
             }
-          },
-        ),
+          }
+
+          if (isImage) {
+            return Card(
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: handleTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.network(
+                      attachment.url,
+                      fit: BoxFit.cover,
+                      height: 150,
+                      width: double.infinity,
+                      loadingBuilder: (context, child, progress) =>
+                          progress == null
+                          ? child
+                          : const SizedBox(
+                              height: 150,
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                      errorBuilder: (context, error, stack) => const SizedBox(
+                        height: 150,
+                        child: Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                            size: 40,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(
+                        attachment.realName,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          } else {
+            return Card(
+              child: ListTile(
+                leading: Icon(
+                  isPdf
+                      ? Icons.picture_as_pdf_outlined
+                      : Icons.description_outlined,
+                ),
+                title: Text(
+                  attachment.realName,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                subtitle: Text(formatBytes(attachment.size, 2)),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: handleTap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 
-  Widget _buildTitledCard({required IconData icon, required String title, required Widget child}) {
+  Widget _buildTitledCard({
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
     return Card(
-      elevation: 1, shadowColor: Colors.black.withAlpha(26),
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -558,9 +722,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           children: [
             Row(
               children: [
-                Icon(icon, color: Theme.of(context).textTheme.bodyLarge?.color, size: 20),
+                Icon(
+                  icon,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             const Divider(height: 24),
@@ -571,7 +745,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? statusColor}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? statusColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -581,14 +760,26 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             width: 125,
             child: Row(
               children: [
-                Icon(icon, size: 18, color: Theme.of(context).textTheme.bodySmall?.color),
+                Icon(
+                  icon,
+                  size: 18,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
                 const SizedBox(width: 12),
-                Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
               ],
             ),
           ),
           Expanded(
-            child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: statusColor)),
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+            ),
           ),
         ],
       ),
@@ -601,7 +792,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
@@ -610,9 +806,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Widget _buildResolvedBanner() {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final Color successColor = isDarkMode ? Colors.greenAccent.shade400 : Colors.green.shade800;
-    final Color backgroundColor = isDarkMode ? Colors.green.withAlpha(25) : Colors.green.shade50;
-    final Color borderColor = isDarkMode ? Colors.green.withAlpha(50) : Colors.green.shade200;
+    final Color successColor = isDarkMode
+        ? Colors.greenAccent.shade400
+        : Colors.green.shade800;
+    final Color backgroundColor = isDarkMode
+        ? Colors.green.withAlpha(25)
+        : Colors.green.shade50;
+    final Color borderColor = isDarkMode
+        ? Colors.green.withAlpha(50)
+        : Colors.green.shade200;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -626,7 +828,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         children: [
           Icon(Icons.check_circle_outline_rounded, color: successColor),
           const SizedBox(width: 12),
-          Text('Tiket ini telah diselesaikan.', style: TextStyle(fontWeight: FontWeight.bold, color: successColor, fontSize: 15)),
+          Text(
+            'Tiket ini telah diselesaikan.',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: successColor,
+              fontSize: 15,
+            ),
+          ),
         ],
       ),
     );
@@ -635,28 +844,53 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   Widget _buildInfoCardContent() {
     return Column(
       children: [
-        _buildInfoRow(Icons.bookmark_border, 'Status:', _currentTicket.statusText, statusColor: _getStatusColor(_currentTicket.statusText)),
-        _buildInfoRow(Icons.person_outline, 'Contact:', _currentTicket.requesterName),
-        _buildInfoRow(Icons.business_outlined, 'Unit Kerja:', _currentTicket.custom1),
-        _buildInfoRow(Icons.phone_outlined, 'No Ext/Hp:', _currentTicket.custom2),
+        _buildInfoRow(
+          Icons.bookmark_border,
+          'Status:',
+          _currentTicket.statusText,
+          statusColor: _getStatusColor(_currentTicket.statusText),
+        ),
+        _buildInfoRow(
+          Icons.person_outline,
+          'Contact:',
+          _currentTicket.requesterName,
+        ),
+        _buildInfoRow(
+          Icons.business_outlined,
+          'Unit Kerja:',
+          _currentTicket.custom1,
+        ),
+        _buildInfoRow(
+          Icons.phone_outlined,
+          'No Ext/Hp:',
+          _currentTicket.custom2,
+        ),
       ],
     );
   }
 
   Widget _buildDescriptionCard() {
     return Card(
-      elevation: 1, shadowColor: Colors.black.withAlpha(26),
+      elevation: 1,
+      shadowColor: Colors.black.withAlpha(26),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          maintainState: true, initiallyExpanded: true,
+          maintainState: true,
+          initiallyExpanded: true,
           title: Row(
             children: [
-              Icon(Icons.description_outlined, color: Theme.of(context).textTheme.bodyLarge?.color),
+              Icon(
+                Icons.description_outlined,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               const SizedBox(width: 16),
-              const Text("Deskripsi Permasalahan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                "Deskripsi Permasalahan",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           children: [
@@ -669,14 +903,31 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Subject: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Expanded(child: Text(_currentTicket.subject, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      const Text(
+                        'Subject: ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Expanded(
+                        child: Text(
+                          _currentTicket.subject,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8), const Divider(), const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
                   Html(
                     data: _currentTicket.message,
-                    style: {"body": Style(margin: Margins.zero, padding: HtmlPaddings.zero, fontSize: FontSize(15.0), lineHeight: LineHeight.em(1.4))},
+                    style: {
+                      "body": Style(
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                        fontSize: FontSize(15.0),
+                        lineHeight: LineHeight.em(1.4),
+                      ),
+                    },
                   ),
                 ],
               ),
@@ -692,14 +943,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     return Column(
       children: [
         _buildStaticInfoRow("Tracking ID:", _currentTicket.trackid),
-        _buildStaticInfoRow("Dibuat pada:", dateFormat.format(_currentTicket.creationDate)),
-        _buildStaticInfoRow("Diperbarui:", dateFormat.format(_currentTicket.lastChange)),
+        _buildStaticInfoRow(
+          "Dibuat pada:",
+          dateFormat.format(_currentTicket.creationDate),
+        ),
+        _buildStaticInfoRow(
+          "Diperbarui:",
+          dateFormat.format(_currentTicket.lastChange),
+        ),
         _buildStaticInfoRow("Balasan:", _currentTicket.replies.toString()),
-        _buildStaticInfoRow("Balasan terakhir:", _currentTicket.lastReplierText),
+        _buildStaticInfoRow(
+          "Balasan terakhir:",
+          _currentTicket.lastReplierText,
+        ),
       ],
     );
   }
-  
+
   Widget _buildTimeWorkedBar() {
     return InkWell(
       borderRadius: BorderRadius.circular(8),
@@ -708,26 +968,50 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.primaryContainer.withAlpha(30),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Theme.of(context).colorScheme.primaryContainer.withAlpha(50)),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.primaryContainer.withAlpha(50),
+          ),
         ),
         child: Row(
           children: [
-            Icon(Icons.timer_outlined, size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.timer_outlined,
+              size: 28,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Waktu Pengerjaan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Text(
+                  'Waktu Pengerjaan',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
                 const SizedBox(height: 2),
-                Text(_formatDuration(_workedDuration), style: TextStyle(fontFamily: 'monospace', fontSize: 18, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
+                Text(
+                  _formatDuration(_workedDuration),
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ],
             ),
             const Spacer(),
             IconButton(
-              icon: Icon(_isStopwatchRunning ? Icons.pause_circle_filled : Icons.play_circle_filled, size: 32),
+              icon: Icon(
+                _isStopwatchRunning
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_filled,
+                size: 32,
+              ),
               onPressed: _isResolved ? null : _toggleStopwatch,
               tooltip: _isStopwatchRunning ? 'Stop Timer' : 'Start Timer',
-              color: _isStopwatchRunning ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
+              color: _isStopwatchRunning
+                  ? Theme.of(context).colorScheme.error
+                  : Theme.of(context).colorScheme.primary,
             ),
           ],
         ),
@@ -744,7 +1028,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             onPressed: _markAsResolved,
             icon: const Icon(Icons.check_circle_outline, size: 20),
             label: const Text('Tandai Selesai'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade600, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         if (!_isResolved && _assignedTo != widget.currentUserName) ...[
           const SizedBox(height: 8),
@@ -752,7 +1042,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             onPressed: _assignToMe,
             icon: const Icon(Icons.person_add_alt_1_outlined, size: 20),
             label: const Text('Tugaskan ke Saya'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ],
@@ -766,25 +1062,65 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         const SizedBox(height: 16),
         _buildActionShortcuts(),
         const Divider(height: 32),
-        _buildDropdownRow(label: 'Status tiket:', value: _selectedStatus, items: _statusOptions, onChanged: (v) => setState(() => _selectedStatus = v!), isStatus: true),
-        _buildDropdownRow(label: 'Prioritas:', value: _selectedPriority, items: _priorityOptions, onChanged: (v) => setState(() => _selectedPriority = v!), isPriority: true),
-        _buildDropdownRow(label: 'Kategori:', value: _selectedCategory, items: widget.allCategories, onChanged: (v) => setState(() => _selectedCategory = v!)),
-        _buildDropdownRow(label: 'Ditugaskan ke:', value: _assignedTo, items: widget.allTeamMembers, onChanged: (v) => setState(() => _assignedTo = v!)),
+        _buildDropdownRow(
+          label: 'Status tiket:',
+          value: _selectedStatus,
+          items: _statusOptions,
+          onChanged: (v) => setState(() => _selectedStatus = v!),
+          isStatus: true,
+        ),
+        _buildDropdownRow(
+          label: 'Prioritas:',
+          value: _selectedPriority,
+          items: _priorityOptions,
+          onChanged: (v) => setState(() => _selectedPriority = v!),
+          isPriority: true,
+        ),
+        _buildDropdownRow(
+          label: 'Kategori:',
+          value: _selectedCategory,
+          items: widget.allCategories,
+          onChanged: (v) => setState(() => _selectedCategory = v!),
+        ),
+        _buildDropdownRow(
+          label: 'Ditugaskan ke:',
+          value: _assignedTo,
+          items: widget.allTeamMembers,
+          onChanged: (v) => setState(() => _assignedTo = v!),
+        ),
         const SizedBox(height: 16),
         SizedBox(
-          width: double.infinity, height: 50,
+          width: double.infinity,
+          height: 50,
           child: ElevatedButton.icon(
-            icon: _isSaving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)) : const Icon(Icons.save_outlined),
-            label: _isSaving ? const SizedBox.shrink() : const Text("Simpan Perubahan"),
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: _isSaving
+                ? const SizedBox.shrink()
+                : const Text("Simpan Perubahan"),
             onPressed: _isSaving ? null : _saveChanges,
-            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Theme.of(context).colorScheme.onPrimary, elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
-  
-  // --- PERUBAHAN: Menambahkan logika untuk menampilkan bendera prioritas ---
+
   Widget _buildDropdownRow({
     required String label,
     required String value,
@@ -797,7 +1133,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+          ),
           Expanded(
             flex: 2,
             child: DropdownButtonHideUnderline(
@@ -837,10 +1178,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                   } else {
                     child = Text(item, overflow: TextOverflow.ellipsis);
                   }
-                  return DropdownMenuItem<String>(
-                    value: item,
-                    child: child,
-                  );
+                  return DropdownMenuItem<String>(value: item, child: child);
                 }).toList(),
                 onChanged: _isResolved ? null : onChanged,
               ),
@@ -855,42 +1193,109 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_pickedFiles.isNotEmpty) ...[
+          Container(
+            height: 100,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ListView.builder(
+              itemCount: _pickedFiles.length,
+              itemBuilder: (context, index) {
+                final file = _pickedFiles[index];
+                return ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: Text(
+                    file.path.split('/').last,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => _removeFile(index),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
         TextFormField(
           controller: _replyMessageController,
-          decoration: const InputDecoration(hintText: 'Ketik balasan Anda...', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            hintText: 'Ketik balasan Anda...',
+            border: OutlineInputBorder(),
+          ),
           maxLines: 6,
         ),
         const SizedBox(height: 16),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              flex: 2,
               child: DropdownButtonFormField<String>(
                 value: _submitAsAction,
-                items: _submitAsOptions.map((v) => DropdownMenuItem<String>(value: v, child: Text(v, overflow: TextOverflow.ellipsis, style: TextStyle(color: _getStatusColor(v), fontWeight: FontWeight.bold)))).toList(),
-                onChanged: (v) => setState(() { if (v != null) _submitAsAction = v; }),
-                decoration: const InputDecoration(labelText: 'Submit sebagai', border: OutlineInputBorder()),
+                items: _submitAsOptions
+                    .map(
+                      (v) => DropdownMenuItem<String>(
+                        value: v,
+                        child: Text(
+                          v,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _getStatusColor(v),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  if (v != null) _submitAsAction = v;
+                }),
+                decoration: const InputDecoration(
+                  labelText: 'Submit sebagai',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
               ),
             ),
+            
             const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.attach_file),
+              onPressed: _pickFiles,
+              tooltip: 'Lampirkan File',
+              padding: const EdgeInsets.all(12),
+              constraints: const BoxConstraints(),
+            ),
             ElevatedButton(
               onPressed: _isSubmittingReply ? null : _submitReply,
               style: ElevatedButton.styleFrom(
-                minimumSize: const Size(110, 58), backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary, elevation: 4,
-                textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                minimumSize: const Size(0, 58),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
               ),
-              child: _isSubmittingReply ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white)) : const Text('Submit'),
+              child: _isSubmittingReply
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Submit'),
             ),
           ],
         ),
       ],
     );
   }
-  
-  // --- BARU: Helper untuk mendapatkan path ikon & warna prioritas ---
+
   String _getPriorityIconPath(String priority) {
     switch (priority) {
       case 'Critical':
@@ -902,7 +1307,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       case 'Low':
         return 'assets/images/label-low.png';
       default:
-        return 'assets/images/label-medium.png'; 
+        return 'assets/images/label-medium.png';
     }
   }
 
@@ -920,16 +1325,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         return Colors.grey;
     }
   }
-  
+
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'New': return const Color(0xFFD32F2F);
-      case 'Waiting Reply': return const Color(0xFFE65100);
-      case 'Replied': return const Color(0xFF1976D2);
-      case 'In Progress': return const Color(0xFF673AB7);
-      case 'On Hold': return const Color(0xFFC2185B);
-      case 'Resolved': return const Color(0xFF388E3C);
-      default: return Colors.grey.shade700;
+      case 'New':
+        return const Color(0xFFD32F2F);
+      case 'Waiting Reply':
+        return const Color(0xFFE65100);
+      case 'Replied':
+        return const Color(0xFF1976D2);
+      case 'In Progress':
+        return const Color(0xFF673AB7);
+      case 'On Hold':
+        return const Color(0xFFC2185B);
+      case 'Resolved':
+        return const Color(0xFF388E3C);
+      default:
+        return Colors.grey.shade700;
     }
   }
 }

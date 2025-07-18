@@ -1,3 +1,5 @@
+// GANTIKAN SELURUH ISI FILE anri_helpdesk-main/lib/main.dart ANDA DENGAN KODE INI
+
 import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
@@ -7,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
@@ -44,6 +47,7 @@ Future<void> main() async {
     debugPrint(details.toString());
     return Material(
       child: Container(
+        color: const Color(0xFF212f3c),
         color: const Color(0xFF212f3c),
         child: Center(
           child: Padding(
@@ -150,6 +154,24 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+
+        // --- [AWAL PERUBAHAN ADA DI SINI] ---
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: const Color.fromARGB(255, 29, 40, 52),
+          selectedItemColor: Colors.lightBlue.shade200,
+          unselectedItemColor: Colors.grey.shade500,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.normal,
+            fontSize: 12,
+          ),
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+        ),
+        // --- [AKHIR PERUBAHAN ADA DI SINI] ---
       ),
       home: const SplashScreen(),
       debugShowCheckedModeBanner: false,

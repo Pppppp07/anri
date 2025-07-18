@@ -76,23 +76,27 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   }
 
   Future<void> _saveCredentials({
-    required Map<String, dynamic> userData,
-    required String token,
-  }) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', true);
-    await prefs.setInt('user_id', userData['id']);
-    await prefs.setString('user_name', userData['name']);
-    await prefs.setString('user_username', userData['username']);
-    await prefs.setString('user_email', userData['email']);
-    await prefs.setString('auth_token', token);
-    await prefs.setBool('rememberMe', _rememberMe);
-  }
+  required Map<String, dynamic> userData,
+  required String token,
+}) async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('isLoggedIn', true);
+  await prefs.setInt('user_id', userData['id']);
+  await prefs.setString('user_name', userData['name']);
+  await prefs.setString('user_email', userData['email']);
+  await prefs.setString('auth_token', token);
+  await prefs.setBool('rememberMe', _rememberMe);
 
-  Future<void> _clearCredentials() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+  // --- [AWAL PERUBAHAN LOGIKA] ---
+  // Jika 'Ingat Saya' dicentang, simpan username untuk login berikutnya.
+  // Jika tidak dicentang, hapus username yang mungkin tersimpan sebelumnya.
+  if (_rememberMe) {
+    await prefs.setString('user_username', userData['username']);
+  } else {
     await prefs.remove('user_username');
   }
+  // --- [AKHIR PERUBAHAN LOGIKA] ---
+}
 
   void _handleLogin() async {
     HapticFeedback.lightImpact();

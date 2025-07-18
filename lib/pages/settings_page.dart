@@ -24,7 +24,7 @@ class _SettingsPageState extends State<SettingsPage> {
         return 'Terang';
       case ThemeMode.dark:
         return 'Gelap';
-      case ThemeMode.system:
+      // Semua kasus lain, termasuk 'ThemeMode.system', akan ditangani oleh default.
       default:
         return 'Sesuai Sistem';
     }
@@ -35,7 +35,8 @@ class _SettingsPageState extends State<SettingsPage> {
     bool authenticated = false;
     try {
       authenticated = await auth.authenticate(
-        localizedReason: 'Silakan otentikasi untuk mengubah pengaturan keamanan',
+        localizedReason:
+            'Silakan otentikasi untuk mengubah pengaturan keamanan',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,
@@ -59,10 +60,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final settingsProvider = context.watch<SettingsProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
-        elevation: 1,
-      ),
+      appBar: AppBar(title: const Text('Pengaturan'), elevation: 1),
       body: ListView(
         children: [
           _buildSectionHeader('Notifikasi'),
@@ -75,7 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
             },
             secondary: const Icon(Icons.notifications_active_outlined),
           ),
-          
+
           _buildSectionHeader('Tampilan & Preferensi'),
           _buildOptionTile(
             icon: Icons.brightness_6_outlined,
@@ -89,7 +87,7 @@ class _SettingsPageState extends State<SettingsPage> {
             currentValue: settingsProvider.refreshIntervalText,
             onTap: () => _showRefreshIntervalDialog(settingsProvider),
           ),
-          
+
           _buildSectionHeader('Keamanan'),
           SwitchListTile(
             title: const Text('Kunci Aplikasi'),
@@ -103,7 +101,7 @@ class _SettingsPageState extends State<SettingsPage> {
             },
             secondary: const Icon(Icons.fingerprint),
           ),
-          
+
           _buildSectionHeader('Data'),
           _buildOptionTile(
             icon: Icons.delete_sweep_outlined,
@@ -139,20 +137,25 @@ class _SettingsPageState extends State<SettingsPage> {
   }) {
     return ListTile(
       // --- PERBAIKAN: Beri warna eksplisit pada ikon ---
-      leading: Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      leading: Icon(
+        icon,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       title: Text(title),
       // --- PERBAIKAN: Ganti warna subtitle agar lebih terlihat ---
-      subtitle: currentValue != null 
+      subtitle: currentValue != null
           ? Text(
               currentValue,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)
-            ) 
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
           : null,
       trailing: const Icon(Icons.chevron_right, size: 20),
       onTap: onTap,
     );
   }
-  
+
   void _showThemeDialog(ThemeProvider themeProvider) {
     showDialog(
       context: context,
@@ -167,7 +170,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: ThemeMode.light,
                 groupValue: themeProvider.themeMode,
                 onChanged: (value) {
-                  if (value != null) context.read<ThemeProvider>().setThemeMode(value);
+                  if (value != null)
+                    context.read<ThemeProvider>().setThemeMode(value);
                   Navigator.of(context).pop();
                 },
               ),
@@ -176,7 +180,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: ThemeMode.dark,
                 groupValue: themeProvider.themeMode,
                 onChanged: (value) {
-                  if (value != null) context.read<ThemeProvider>().setThemeMode(value);
+                  if (value != null)
+                    context.read<ThemeProvider>().setThemeMode(value);
                   Navigator.of(context).pop();
                 },
               ),
@@ -185,7 +190,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: ThemeMode.system,
                 groupValue: themeProvider.themeMode,
                 onChanged: (value) {
-                  if (value != null) context.read<ThemeProvider>().setThemeMode(value);
+                  if (value != null)
+                    context.read<ThemeProvider>().setThemeMode(value);
                   Navigator.of(context).pop();
                 },
               ),
@@ -198,7 +204,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _showRefreshIntervalDialog(SettingsProvider settingsProvider) {
     final Map<String, int> intervals = {
-      '15 detik': 15, '30 detik': 30, '1 menit': 60, 'Mati': 0
+      '15 detik': 15,
+      '30 detik': 30,
+      '1 menit': 60,
+      'Mati': 0,
     };
 
     showDialog(
@@ -214,7 +223,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: entry.key,
                 groupValue: settingsProvider.refreshIntervalText,
                 onChanged: (value) {
-                  context.read<SettingsProvider>().setRefreshInterval(entry.value);
+                  context.read<SettingsProvider>().setRefreshInterval(
+                    entry.value,
+                  );
                   Navigator.of(context).pop();
                 },
               );
@@ -230,7 +241,9 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Hapus Cache?'),
-        content: const Text('Tindakan ini akan menghapus data sementara seperti preferensi tema dan pengaturan. Lanjutkan?'),
+        content: const Text(
+          'Tindakan ini akan menghapus data sementara seperti preferensi tema dan pengaturan. Lanjutkan?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -246,12 +259,14 @@ class _SettingsPageState extends State<SettingsPage> {
               context.read<SettingsProvider>().setAppLock(false);
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cache berhasil dihapus! Pengaturan direset ke default.'))
+                const SnackBar(
+                  content: Text(
+                    'Cache berhasil dihapus! Pengaturan direset ke default.',
+                  ),
+                ),
               );
             },
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Hapus'),
           ),
         ],
