@@ -1,27 +1,50 @@
+import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
+import 'package:anri/services/firebase_api.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:anri/pages/splash_screen.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
+// Kunci global untuk state navigator, memungkinkan navigasi dari luar widget tree.
+final navigatorKey = GlobalKey<NavigatorState>();
+
+// Handler ini harus berada di luar kelas (top-level function) agar bisa berjalan
+// saat aplikasi berada di background atau terminate.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Pastikan Firebase diinisialisasi sebelum digunakan.
+  await Firebase.initializeApp();
+  debugPrint("Notifikasi Background Diterima: ${message.messageId}");
+  // Anda bisa menambahkan logika lain di sini, seperti menyimpan data notifikasi
+  // menggunakan SharedPreferences jika diperlukan.
+}
+
 Future<void> main() async {
+  // Pastikan semua binding Flutter siap sebelum menjalankan kode.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inisialisasi Firebase sebagai langkah pertama.
+  await Firebase.initializeApp();
+  
+  // Daftarkan handler untuk pesan notifikasi background.
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Inisialisasi format tanggal untuk bahasa Indonesia.
   await initializeDateFormatting('id_ID', null);
+  // Muat variabel lingkungan dari file .env.
   await dotenv.load(fileName: ".env");
 
-  // --- SOLUSI YANG LEBIH AMAN DAN BENAR ---
+  // Error handler kustom untuk menggantikan Red Screen of Death.
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    // Di mode debug, kita tetap ingin melihat error aslinya di konsol.
     debugPrint(details.toString());
-    
-    // Kembalikan sebuah widget yang sangat sederhana dan mandiri.
-    // Ini untuk menggantikan "Layar Merah" yang default.
     return Material(
       child: Container(
-        color: const Color(0xFF212f3c), // Warna latar gelap agar nyaman dilihat
+        color: const Color(0xFF212f3c),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -45,12 +68,11 @@ Future<void> main() async {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Silakan coba restart aplikasi. Jika masalah berlanjut, hubungi developer dengan informasi error di bawah ini.',
+                  'Silakan coba restart aplikasi. Jika masalah berlanjut, hubungi developer.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[400]),
                 ),
                 const SizedBox(height: 20),
-                // Menampilkan detail error yang lebih sederhana untuk dilaporkan
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -58,7 +80,7 @@ Future<void> main() async {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: SelectableText(
-                    details.exception.toString(), // Menampilkan error aslinya
+                    details.exception.toString(),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
@@ -73,14 +95,16 @@ Future<void> main() async {
       ),
     );
   };
-  // --- AKHIR BLOK SOLUSI ---
   
+  // Jalankan aplikasi dengan semua provider yang dibutuhkan.
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => TicketProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        // Sediakan FirebaseApi service ke widget tree.
+        Provider<FirebaseApi>(create: (_) => FirebaseApi()),
       ],
       child: const MyApp(),
     ),
@@ -95,6 +119,8 @@ class MyApp extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp(
+      // Pasang navigatorKey di sini.
+      navigatorKey: navigatorKey,
       title: 'Helpdesk Mobile',
       themeMode: themeProvider.themeMode,
       theme: ThemeData(
@@ -126,7 +152,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const SplashScreen(),
-      debugShowCheckedModeBanner: false, //mengilangkan banner debug
+      debugShowCheckedModeBanner: false,
     );
   }
 }

@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:anri/services/firebase_api.dart'; 
 import 'package:anri/config/api_config.dart';
 import 'package:anri/models/ticket_model.dart';
 import 'package:anri/pages/error_page.dart';
@@ -93,7 +94,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      FirebaseApi().initNotifications();
       _triggerSearch();
       _fetchTeamMembers();
       _startAutoRefreshTimer();
