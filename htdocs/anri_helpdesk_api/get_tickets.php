@@ -1,9 +1,12 @@
 <?php
-require 'cors_handler.php';
+// --- HEADER WAJIB UNTUK SEMUA ENDPOINT YANG BUTUH LOGIN ---
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/cors_handler.php';
 ob_start();
 
-require 'auth_check.php';
-require 'koneksi.php';
+// Panggil auth_check.php. File ini sudah memanggil koneksi.php (yang berisi write_log).
+require_once __DIR__ . '/auth_check.php';
+// --- AKHIR HEADER WAJIB ---
 
 $response = ['success' => false, 'data' => [], 'message' => 'Gagal mengambil data tiket.'];
 
@@ -12,9 +15,13 @@ try {
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
     $offset = ($page - 1) * $limit;
 
+    // --- [AWAL PERUBAHAN] ---
+    $sort_by = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'date'; // Ambil parameter sort
+    // --- [AKHIR PERUBAHAN] ---
+
     $status_filter_text = isset($_GET['status']) ? trim($_GET['status']) : 'All';
     $category_filter = isset($_GET['category']) ? trim($_GET['category']) : 'All';
-    $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $search_query = isset($_GET['q']) ? trim($_GET['q']) : '';
     $priority_filter_text = isset($_GET['priority']) ? trim($_GET['priority']) : 'All';
     $assignee_filter = isset($_GET['assignee']) ? trim($_GET['assignee']) : '';
 
@@ -24,25 +31,22 @@ try {
     $params = [];
     $types = '';
 
+    // ... (SEMUA BLOK 'if' UNTUK FILTER TETAP SAMA) ...
     if (!empty($assignee_filter)) {
         if ($assignee_filter === 'Unassigned') { $conditions[] = "t.owner = 0"; } 
         else { $conditions[] = "LOWER(o.name) = LOWER(?)"; $params[] = $assignee_filter; $types .= 's'; }
     }
-
     $status_map = ['New' => 0, 'Waiting Reply' => 1, 'Replied' => 2, 'Resolved' => 3, 'In Progress' => 4, 'On Hold' => 5];
     if ($status_filter_text == 'All') {
         if (empty($assignee_filter) && $_GET['status'] !== 'Resolved') { $conditions[] = "t.status != ?"; $params[] = 3; $types .= 'i'; }
     } else if (array_key_exists($status_filter_text, $status_map)) {
         $conditions[] = "t.status = ?"; $params[] = $status_map[$status_filter_text]; $types .= 'i';
     }
-    
     $priority_map_filter = ['Critical' => 0, 'High' => 1, 'Medium' => 2, 'Low' => 3];
     if ($priority_filter_text != 'All' && array_key_exists($priority_filter_text, $priority_map_filter)) {
         $conditions[] = "t.priority = ?"; $params[] = $priority_map_filter[$priority_filter_text]; $types .= 'i';
     }
-
     if ($category_filter != 'All') { $conditions[] = "t.category = ?"; $params[] = (int)$category_filter; $types .= 'i'; }
-    
     if (!empty($search_query)) {
         $search_param = "%" . $search_query . "%";
         $conditions[] = "(t.subject LIKE ? OR t.trackid LIKE ? OR t.name LIKE ?)";
@@ -51,7 +55,18 @@ try {
     }
 
     if (!empty($conditions)) { $sql .= " WHERE " . implode(" AND ", $conditions); }
-    $sql .= " ORDER BY t.priority ASC, t.lastchange DESC";
+    
+    // --- [AWAL PERUBAHAN] ---
+    // Tentukan klausa ORDER BY secara dinamis
+    if ($sort_by === 'priority') {
+        // Prioritas HESK: 0=Critical, 1=High, 2=Medium, 3=Low. Jadi urutkan ASC.
+        $sql .= " ORDER BY t.priority ASC, t.lastchange DESC";
+    } else {
+        // Default urutkan berdasarkan tanggal
+        $sql .= " ORDER BY t.lastchange DESC";
+    }
+    // --- [AKHIR PERUBAHAN] ---
+
     $sql .= " LIMIT ? OFFSET ?";
     $params[] = $limit;
     $params[] = $offset;
@@ -65,17 +80,9 @@ try {
 
     $tickets = [];
     if ($result) {
+        // ... (SISA DARI KODE WHILE LOOP UNTUK MEMPROSES DATA TETAP SAMA) ...
         $status_map_rev = [0 => 'New', 1 => 'Waiting Reply', 2 => 'Replied', 3 => 'Resolved', 4 => 'In Progress', 5 => 'On Hold'];
-        
-        // ---- INI BAGIAN PALING PENTING ---- //
-        // Pastikan mapping di server Anda sama persis seperti ini
-        $priority_map_rev = [
-            0 => 'Critical', 
-            1 => 'High', 
-            2 => 'Medium', // Angka 2 akan selalu menjadi "Medium"
-            3 => 'Low'
-        ];
-
+        $priority_map_rev = [ 0 => 'Critical', 1 => 'High', 2 => 'Medium', 3 => 'Low' ];
         while ($row = mysqli_fetch_assoc($result)) {
             $row['owner_name'] = $row['owner_name'] ?? 'Unassigned';
             $row['subject'] = html_entity_decode($row['subject'] ?? '', ENT_QUOTES, 'UTF-8');

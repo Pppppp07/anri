@@ -1,14 +1,14 @@
 <?php
-
 ob_start();
 
 
+require_once __DIR__ . '/vendor/autoload.php';
 
-require 'koneksi.php';
 
-require 'cors_handler.php';
+require_once __DIR__ . '/koneksi.php';
+require_once __DIR__ . '/cors_handler.php';
 
-// Inisialisasi array response default
+
 $response = ['success' => false, 'message' => 'Terjadi kesalahan yang tidak diketahui.'];
 
 // Ambil data JSON dari body request
@@ -19,7 +19,7 @@ if (is_object($data) && isset($data->username) && isset($data->password)) {
     $username = $data->username;
     $password = $data->password;
 
-    // Gunakan prepared statement untuk keamanan (sudah benar)
+    // Gunakan prepared statement untuk keamanan
     $sql = "SELECT id, `user`, `pass`, `name`, `email` FROM `hesk_users` WHERE `user` = ?";
     $stmt = mysqli_prepare($conn, $sql);
 
@@ -31,18 +31,18 @@ if (is_object($data) && isset($data->username) && isset($data->password)) {
         if (mysqli_num_rows($result) > 0) {
             $row = mysqli_fetch_assoc($result);
 
-            // Verifikasi password (sudah benar)
+            // Verifikasi password
             if (password_verify($password, $row['pass'])) {
                 try {
                     $user_id = $row['id'];
 
-                    // Logika pembuatan token (sudah benar)
+                    // Logika pembuatan token
                     $selector = bin2hex(random_bytes(6));
                     $validator = bin2hex(random_bytes(32));
                     $hashed_validator = hash('sha256', $validator);
                     $expires = date('Y-m-d H:i:s', time() + (30 * 24 * 60 * 60)); // 30 hari
 
-                    // Gunakan transaksi untuk memastikan konsistensi data (sudah benar)
+                    // Gunakan transaksi untuk memastikan konsistensi data
                     mysqli_begin_transaction($conn);
 
                     // Hapus token lama
@@ -93,20 +93,19 @@ if (is_object($data) && isset($data->username) && isset($data->password)) {
     $response['message'] = "Data tidak lengkap. Pastikan username dan password dikirim.";
 }
 
-// --- BAGIAN AKHIR YANG DIPERBAIKI ---
 
-// 3. Bersihkan semua output yang mungkin sudah ada (termasuk notice/warning PHP)
+// Bersihkan semua output yang mungkin sudah ada (termasuk notice/warning PHP)
 ob_clean();
 
-// 4. Set header sebagai JSON
+// Set header sebagai JSON
 header('Content-Type: application/json');
 
-// 5. Tutup koneksi database
+// Tutup koneksi database
 mysqli_close($conn);
 
-// 6. Cetak response sebagai JSON murni
+// Cetak response sebagai JSON murni
 echo json_encode($response);
 
-// 7. Hentikan eksekusi skrip
+// Hentikan eksekusi skrip
 exit();
 ?>

@@ -1,5 +1,3 @@
-// lib/providers/ticket_provider.dart
-
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
 import 'package:anri/models/ticket_model.dart';
@@ -9,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum ListState { loading, hasData, empty, error }
 
-enum SortDirection { asc, desc }
+enum SortType { byDate, byPriority }
 
 class TicketProvider with ChangeNotifier {
   List<Ticket> _tickets = [];
@@ -19,44 +17,95 @@ class TicketProvider with ChangeNotifier {
   bool _isLoadingMore = false;
   int _currentPage = 1;
 
-  SortDirection _prioritySortDirection = SortDirection.desc; 
+  SortType _currentSortType = SortType.byDate; // Default sort
 
   List<Ticket> get tickets => _tickets;
   ListState get listState => _listState;
   String get errorMessage => _errorMessage;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
-  SortDirection get prioritySortDirection => _prioritySortDirection;
+  SortType get currentSortType => _currentSortType;
 
-  final Map<String, int> _priorityMap = {
-    'Low': 0,
-    'Medium': 1,
-    'High': 2,
-    'Critical': 3,
-  };
+  // --- [PERUBAHAN] HAPUS _priorityMap dan _sortTickets() ---
+  // Peta prioritas dan fungsi _sortTickets() tidak lagi diperlukan karena sorting dilakukan oleh server.
 
-  void _sortTickets() {
-    _tickets.sort((a, b) {
-      // --- PERBAIKAN: Menggunakan `priorityText` bukan `priority` ---
-      final priorityA = _priorityMap[a.priorityText] ?? -1;
-      final priorityB = _priorityMap[b.priorityText] ?? -1;
-      
-      if (_prioritySortDirection == SortDirection.asc) {
-        return priorityA.compareTo(priorityB);
+  // --- [PERUBAHAN] Ubah toggleSort ---
+  void toggleSort() {
+    // Metode ini sekarang hanya mengubah state dan memberi tahu UI (untuk animasi ikon).
+    // Pengambilan data akan di-handle oleh UI (_triggerSearch di home_page).
+    _currentSortType = (_currentSortType == SortType.byDate)
+        ? SortType.byPriority
+        : SortType.byDate;
+    notifyListeners();
+  }
+
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('auth_token');
+    return token != null ? {'Authorization': 'Bearer $token'} : {};
+  }
+
+  Future<List<Ticket>> _fetchData(Uri url, Map<String, String> headers) async {
+    final response = await http
+        .get(url, headers: headers)
+        .timeout(const Duration(seconds: 20));
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      if (responseData['success'] == true) {
+        final List<dynamic> data = responseData['data'];
+        return data.map((json) => Ticket.fromJson(json)).toList();
       } else {
-        return priorityB.compareTo(priorityA);
+        throw Exception(
+          responseData['message'] ?? 'Gagal mengambil data tiket',
+        );
       }
-    });
+    } else if (response.statusCode == 401) {
+      throw Exception('Unauthorized: Sesi Anda mungkin telah berakhir.');
+    } else {
+      throw Exception(
+        'Gagal terhubung ke server: Status ${response.statusCode}',
+      );
+    }
   }
 
-  void togglePrioritySortDirection() {
-    _prioritySortDirection = _prioritySortDirection == SortDirection.asc
-        ? SortDirection.desc
-        : SortDirection.asc;
-    _sortTickets(); 
-    notifyListeners(); 
+  String _getEndpoint(String assignee) {
+    return assignee.isNotEmpty ? '/get_my_tickets.php' : '/get_tickets.php';
   }
 
+  // --- [PERUBAHAN] Modifikasi _fetchPage untuk mengirim parameter sort_by ---
+  Future<List<Ticket>> _fetchPage(
+    int page, {
+    required String status,
+    required String category,
+    required String searchQuery,
+    required String priority,
+    required String assignee,
+  }) async {
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty)
+      throw Exception('Token tidak ditemukan atau sesi berakhir.');
+
+    // Tentukan nilai parameter sort_by berdasarkan state saat ini
+    final String sortByParam = _currentSortType == SortType.byPriority
+        ? 'priority'
+        : 'date';
+
+    final endpoint = _getEndpoint(assignee);
+    final url = Uri.parse('${ApiConfig.baseUrl}$endpoint').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'status': status,
+        'category': category,
+        'q': searchQuery,
+        'priority': priority,
+        'sort_by': sortByParam, // <-- KIRIM PARAMETER SORTING KE API
+      },
+    );
+    return _fetchData(url, headers);
+  }
+
+  // --- [PERUBAHAN] Sederhanakan fetchTickets, hapus _sortTickets() ---
   Future<void> fetchTickets({
     required String status,
     required String category,
@@ -66,34 +115,52 @@ class TicketProvider with ChangeNotifier {
     bool isRefresh = false,
     bool isBackgroundRefresh = false,
   }) async {
+    if (isBackgroundRefresh) {
+      try {
+        List<Ticket> refreshedTickets = [];
+        for (var i = 1; i <= _currentPage; i++) {
+          final pageData = await _fetchPage(
+            i,
+            status: status,
+            category: category,
+            searchQuery: searchQuery,
+            priority: priority,
+            assignee: assignee,
+          );
+          refreshedTickets.addAll(pageData);
+          if (pageData.length < 10) {
+            _hasMore = false;
+            break;
+          }
+        }
+        _tickets = refreshedTickets;
+        _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
+        notifyListeners();
+      } catch (e) {
+        debugPrint("Background refresh failed silently: $e");
+      }
+      return;
+    }
+
     if (isRefresh) {
       _currentPage = 1;
       _hasMore = true;
-    }
-
-    if (!isBackgroundRefresh) {
       _listState = ListState.loading;
       notifyListeners();
     }
 
     try {
-      List<Ticket> newTickets;
-      if (assignee.isNotEmpty) {
-        newTickets = await _fetchMyTicketsPage(_currentPage, searchQuery, priority, category);
-      } else {
-        newTickets = await _fetchAllTicketsPage(_currentPage, status, category, searchQuery, priority);
-      }
-
-      if (isRefresh) {
-        _tickets = newTickets;
-      } else {
-        _tickets.addAll(newTickets);
-      }
-      
-      _sortTickets();
-
+      final newTickets = await _fetchPage(
+        _currentPage,
+        status: status,
+        category: category,
+        searchQuery: searchQuery,
+        priority: priority,
+        assignee: assignee,
+      );
+      _tickets = newTickets;
       _listState = _tickets.isEmpty ? ListState.empty : ListState.hasData;
-      _hasMore = newTickets.length == 10;
+      _hasMore = newTickets.length >= 10;
     } catch (e) {
       _errorMessage = e.toString();
       _listState = ListState.error;
@@ -102,6 +169,7 @@ class TicketProvider with ChangeNotifier {
     }
   }
 
+  // --- [PERUBAHAN] Sederhanakan loadMoreTickets, hapus _sortTickets() ---
   Future<void> loadMoreTickets({
     required String status,
     required String category,
@@ -116,73 +184,21 @@ class TicketProvider with ChangeNotifier {
     _currentPage++;
 
     try {
-      List<Ticket> newTickets;
-      if (assignee.isNotEmpty) {
-        newTickets = await _fetchMyTicketsPage(_currentPage, searchQuery, priority, category);
-      } else {
-        newTickets = await _fetchAllTicketsPage(_currentPage, status, category, searchQuery, priority);
-      }
-
+      final newTickets = await _fetchPage(
+        _currentPage,
+        status: status,
+        category: category,
+        searchQuery: searchQuery,
+        priority: priority,
+        assignee: assignee,
+      );
       _tickets.addAll(newTickets);
-      _sortTickets();
-
-      _hasMore = newTickets.length == 10;
+      _hasMore = newTickets.length >= 10;
     } catch (e) {
-      _currentPage--; 
+      _currentPage--;
     } finally {
       _isLoadingMore = false;
       notifyListeners();
     }
-  }
-
-  Future<List<Ticket>> _fetchAllTicketsPage(int page, String status, String category, String searchQuery, String priority) async {
-    final headers = await _getAuthHeaders();
-    if (headers.isEmpty) throw Exception('Token tidak ditemukan');
-
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_tickets.php').replace(queryParameters: {
-      'page': page.toString(),
-      'status': status,
-      'category': category,
-      'q': searchQuery,
-      'priority': priority,
-    });
-    return _fetchData(url, headers);
-  }
-
-  Future<List<Ticket>> _fetchMyTicketsPage(int page, String searchQuery, String priority, String category) async {
-    final headers = await _getAuthHeaders();
-    if (headers.isEmpty) throw Exception('Token tidak ditemukan');
-
-    final url = Uri.parse('${ApiConfig.baseUrl}/get_my_tickets.php').replace(queryParameters: {
-      'page': page.toString(),
-      'q': searchQuery,
-      'priority': priority,
-      'category': category,
-    });
-    return _fetchData(url, headers);
-  }
-
-  Future<List<Ticket>> _fetchData(Uri url, Map<String, String> headers) async {
-    final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 20));
-
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      if (responseData['success'] == true) {
-        final List<dynamic> data = responseData['data'];
-        return data.map((json) => Ticket.fromJson(json)).toList();
-      } else {
-        throw Exception(responseData['message'] ?? 'Gagal mengambil data tiket');
-      }
-    } else if (response.statusCode == 401) {
-      throw Exception('Unauthorized: Sesi Anda mungkin telah berakhir.');
-    } else {
-      throw Exception('Gagal terhubung ke server: Status ${response.statusCode}');
-    }
-  }
-
-  Future<Map<String, String>> _getAuthHeaders() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('auth_token');
-    return token != null ? {'Authorization': 'Bearer $token'} : {};
   }
 }

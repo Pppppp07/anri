@@ -1,0 +1,4 @@
+1. Pindahin folder file anri_helpdesk_api ke local server anda di htdocs kalau pakai xampp
+
+composer require vlucas/phpdotenv
+composer require phpmailer/phpmailer

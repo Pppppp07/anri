@@ -2,6 +2,9 @@ import 'package:anri/models/reply_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
+import 'package:anri/pages/attachment_viewer_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ReplyHistoryTabView extends StatelessWidget {
   final bool isLoadingDetails;
@@ -65,48 +68,99 @@ class ReplyHistoryTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildRepliesList(BuildContext context) {
-    if (isLoadingDetails) {
-      return const Center(child: CircularProgressIndicator());
+  String _formatBytes(int bytes, int decimals) {
+  if (bytes <= 0) return "0 B";
+  const suffixes = ["B", "KB", "MB", "GB", "TB"];
+  var i = (log(bytes) / log(1024)).floor();
+  return '${(bytes / pow(1024, i)).toStringAsFixed(decimals)} ${suffixes[i]}';
+}
+
+Future<void> _launchAttachmentUrl(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Tidak dapat membuka file: $url')),
+            );
+        }
     }
-    if (replies.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 16.0),
-          child: Text('Belum ada balasan.', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
-        ),
-      );
-    }
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: replies.length,
-      separatorBuilder: (context, index) => const Divider(height: 24),
-      itemBuilder: (context, index) {
-        final reply = replies[index];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(reply.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  DateFormat('d MMM yy, HH:mm').format(reply.date),
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Html(data: reply.message),
-          ],
-        );
-      },
+}
+
+
+Widget _buildRepliesList(BuildContext context) {
+  if (isLoadingDetails) {
+    return const Center(child: CircularProgressIndicator());
+  }
+  if (replies.isEmpty) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 16.0),
+        child: Text('Belum ada balasan.', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+      ),
     );
   }
+  return ListView.separated(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: replies.length,
+    separatorBuilder: (context, index) => const Divider(height: 24),
+    itemBuilder: (context, index) {
+      final reply = replies[index];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(reply.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                DateFormat('d MMM yy, HH:mm').format(reply.date),
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Html(data: reply.message),
+
+          // TAMPILKAN LAMPIRAN DI SINI
+          if (reply.attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('Lampiran:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 4),
+            ...reply.attachments.map((att) {
+              return Card(
+                margin: const EdgeInsets.only(top: 4),
+                child: ListTile(
+                  leading: const Icon(Icons.attach_file),
+                  title: Text(att.realName, style: const TextStyle(fontSize: 14)),
+                  subtitle: Text(_formatBytes(att.size, 2)),
+                  onTap: () {
+                     final name = att.realName.toLowerCase();
+                     final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].any((ext) => name.endsWith(ext));
+                     final isPdf = name.endsWith('.pdf');
+                     if (isImage || isPdf) {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => AttachmentViewerPage(attachment: att),
+                            ),
+                        );
+                     } else {
+                       _launchAttachmentUrl(context, att.url);
+                     }
+                  },
+                ),
+              );
+            }).toList(),
+          ]
+        ],
+      );
+    },
+  );
+}
 
    Widget _buildTitledCard({ required BuildContext context, required IconData icon, required String title, required Widget child }) {
     return Card(
