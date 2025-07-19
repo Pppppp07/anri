@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:anri/services/firebase_api.dart'; 
+import 'package:anri/services/firebase_api.dart';
 import 'package:anri/config/api_config.dart';
 import 'package:anri/pages/error_page.dart';
 import 'package:anri/pages/home/widgets/ticket_card.dart';
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/pages/notification_page.dart';
 import 'package:anri/pages/profile_page.dart';
+import 'package:anri/providers/notification_provider.dart'; // <-- PERBAIKAN UTAMA: IMPORT YANG HILANG
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
 import 'package:anri/utils/error_handler.dart';
@@ -97,7 +98,8 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      FirebaseApi().initNotifications();
+      // Panggil initNotifications tanpa await agar tidak memblokir UI
+      context.read<FirebaseApi>().initNotifications();
       _triggerSearch();
       _fetchTeamMembers();
       _startAutoRefreshTimer();
@@ -146,6 +148,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _triggerSearch() {
+    // Pastikan widget masih ada di tree
+    if (!mounted) return;
     final String assigneeParam = _currentView == TicketView.assignedToMe
         ? widget.currentUserName
         : '';
@@ -178,11 +182,8 @@ class _HomePageState extends State<HomePage> {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('auth_token');
     if (token == null) {
-      // --- [PERBAIKAN] use_build_context_synchronously ---
-      // Karena ini bukan method async, pemanggilan _logout aman.
-      // Namun kita akan pastikan _logout juga aman.
       if (mounted) {
-        _logout(context, message: 'Sesi tidak valid. Silakan login kembali.');
+        _logout(message: 'Sesi tidak valid. Silakan login kembali.');
       }
       return {};
     }
@@ -191,25 +192,18 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchTeamMembers() async {
     final headers = await _getAuthHeaders();
-    if (!mounted) {
-      return;
-    }
-    if (headers.isEmpty) {
-      return;
-    }
+    if (!mounted || headers.isEmpty) return;
+
     try {
       final url = Uri.parse('${ApiConfig.baseUrl}/get_users.php');
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 15));
 
-      // --- [PERBAIKAN] use_build_context_synchronously ---
-      // Selalu cek 'mounted' setelah 'await' sebelum menggunakan BuildContext.
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
+      
       if (response.statusCode == 401) {
-        _logout(context, message: 'Sesi tidak valid.');
+        _logout(message: 'Sesi tidak valid.');
         return;
       }
       if (response.statusCode == 200) {
@@ -219,11 +213,7 @@ class _HomePageState extends State<HomePage> {
           final List<String> fetchedMembers = data
               .map((user) => user['name'].toString())
               .toList();
-          setState(
-            () => _teamMembers = fetchedMembers.isNotEmpty
-                ? fetchedMembers
-                : ['Unassigned'],
-          );
+          setState(() => _teamMembers = fetchedMembers.isNotEmpty ? fetchedMembers : ['Unassigned']);
         }
       }
     } catch (e) {
@@ -231,7 +221,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _logout(BuildContext context, {String? message}) async {
+  Future<void> _logout({String? message}) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final bool rememberMe = prefs.getBool('rememberMe') ?? false;
     final String? username = prefs.getString('user_username');
@@ -243,10 +233,7 @@ class _HomePageState extends State<HomePage> {
       await prefs.setString('user_username', username);
     }
 
-    // --- [PERBAIKAN] use_build_context_synchronously ---
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -261,30 +248,33 @@ class _HomePageState extends State<HomePage> {
 
   void _startAutoRefreshTimer() {
     _autoRefreshTimer?.cancel();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
+
     final settingsProvider = context.read<SettingsProvider>();
     if (settingsProvider.refreshInterval == Duration.zero) {
       debugPrint("Auto refresh is OFF");
       return;
     }
-    _autoRefreshTimer = Timer.periodic(settingsProvider.refreshInterval, (
-      timer,
-    ) {
+    
+    _autoRefreshTimer = Timer.periodic(settingsProvider.refreshInterval, (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      final ticketProvider = context.read<TicketProvider>();
       final bool shouldRefresh =
           _selectedIndex != 2 &&
           _searchController.text.isEmpty &&
-          mounted &&
-          context.read<TicketProvider>().listState != ListState.loading &&
-          !context.read<TicketProvider>().isLoadingMore;
+          ticketProvider.listState != ListState.loading &&
+          !ticketProvider.isLoadingMore;
 
       if (shouldRefresh) {
         final String assigneeParam = _currentView == TicketView.assignedToMe
             ? widget.currentUserName
             : '';
         final bool isHomePage = _selectedIndex == 0;
-        context.read<TicketProvider>().fetchTickets(
+        ticketProvider.fetchTickets(
           status: _getStatusForAPI(),
           category: isHomePage ? _homeCategory : _historyCategory,
           searchQuery: _searchController.text,
@@ -299,31 +289,21 @@ class _HomePageState extends State<HomePage> {
 
   String _getPriorityIconPath(String priority) {
     switch (priority) {
-      case 'Critical':
-        return 'assets/images/label-critical.png';
-      case 'High':
-        return 'assets/images/label-high.png';
-      case 'Medium':
-        return 'assets/images/label-medium.png';
-      case 'Low':
-        return 'assets/images/label-low.png';
-      default:
-        return 'assets/images/label-medium.png';
+      case 'Critical': return 'assets/images/label-critical.png';
+      case 'High': return 'assets/images/label-high.png';
+      case 'Medium': return 'assets/images/label-medium.png';
+      case 'Low': return 'assets/images/label-low.png';
+      default: return 'assets/images/label-medium.png';
     }
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority) {
-      case 'Critical':
-        return Colors.red.shade400;
-      case 'High':
-        return Colors.orange.shade400;
-      case 'Medium':
-        return Colors.lightGreen.shade400;
-      case 'Low':
-        return Colors.lightBlue.shade400;
-      default:
-        return Colors.grey;
+      case 'Critical': return Colors.red.shade400;
+      case 'High': return Colors.orange.shade400;
+      case 'Medium': return Colors.lightGreen.shade400;
+      case 'Low': return Colors.lightBlue.shade400;
+      default: return Colors.grey;
     }
   }
 
@@ -348,21 +328,41 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     return Scaffold(
-      appBar: _selectedIndex != 2
+appBar: _selectedIndex != 2
           ? AppBar(
               title: _buildAppBarTitle(),
               actions: _selectedIndex == 0
                   ? [
-                      IconButton(
-                        icon: const Icon(Icons.notifications_none_outlined),
-                        tooltip: 'Notifikasi',
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const NotificationPage(),
-                          ),
-                        ),
+                      // --- PERUBAHAN DIMULAI DI SINI ---
+                      // Kita menggunakan Consumer agar hanya ikon ini yang diperbarui
+                      // saat ada notifikasi baru, bukan seluruh halaman.
+                      Consumer<NotificationProvider>(
+                        builder: (context, notifProvider, child) {
+                          return Badge(
+                            // Tampilkan badge hanya jika ada notifikasi belum dibaca
+                            isLabelVisible: notifProvider.unreadCount > 0,
+                            // Tampilkan jumlah notifikasi sebagai label
+                            label: Text(notifProvider.unreadCount.toString()),
+                            // Widget yang akan diberi badge adalah IconButton
+                            child: IconButton(
+                              icon: const Icon(Icons.notifications_none_outlined),
+                              tooltip: 'Notifikasi',
+                              onPressed: () {
+                                // Saat ikon ditekan, navigasi ke halaman notifikasi
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const NotificationPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
                       ),
+                      // --- AKHIR PERUBAHAN ---
+
+                      // Teks sapaan untuk user
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.only(right: 16.0),
@@ -373,9 +373,9 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ]
-                  : null,
+                  : null, // Jangan tampilkan actions jika bukan di halaman beranda
             )
-          : null,
+          : null, // Jangan tampilkan AppBar sama sekali di halaman profil
       body: Stack(
         children: [
           if (_selectedIndex != 2)

@@ -1,9 +1,12 @@
 <?php
-require 'cors_handler.php';
+// --- HEADER WAJIB UNTUK SEMUA ENDPOINT YANG BUTUH LOGIN ---
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/cors_handler.php';
 ob_start();
 
-require 'auth_check.php';
-require 'koneksi.php';
+// Panggil auth_check.php. File ini sudah memanggil koneksi.php (yang berisi write_log).
+require_once __DIR__ . '/auth_check.php';
+// --- AKHIR HEADER WAJIB ---
 
 $response = [
     'success' => false,

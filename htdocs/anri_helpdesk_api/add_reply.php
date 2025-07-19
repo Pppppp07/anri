@@ -1,4 +1,19 @@
 <?php
+
+
+// 1. WAJIB: Muat autoloader Composer pertama kali.
+// Ini dibutuhkan oleh koneksi.php (untuk Dotenv) dan notification_email.php (untuk PHPMailer).
+require_once __DIR__ . '/vendor/autoload.php';
+
+// 2. WAJIB: Muat file CORS Handler.
+require_once __DIR__ . '/cors_handler.php';
+
+// 3. WAJIB: Muat auth_check.php. File ini sudah otomatis memuat koneksi.php untuk Anda.
+require_once __DIR__ . '/auth_check.php';
+
+// 4. Muat file helper lain yang dibutuhkan setelah autentikasi berhasil.
+require_once __DIR__ . '/notification_email.php';
+
 /**
  * add_reply.php
  * VERSI FINAL GABUNGAN - Menggabungkan semua fitur dengan benar.
@@ -7,13 +22,9 @@
 // Mulai output buffering untuk memastikan tidak ada output liar.
 ob_start();
 
-// Matikan tampilan error langsung ke output untuk mencegah kerusakan JSON.
+// Matikan tampilan error langsung ke output (ini sudah benar).
 error_reporting(0);
 ini_set('display_errors', 0);
-
-require 'koneksi.php';
-require 'auth_check.php';
-require 'notification_email.php';
 
 header("Access-Control-Allow-Origin: *");
 header("Access-control-allow-methods: POST, OPTIONS");
@@ -22,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') { http_response_code(200); exit(); 
 header('Content-Type: application/json');
 
 $response = ['success' => false, 'message' => 'Terjadi kesalahan.'];
-$attach_dir = str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['DOCUMENT_ROOT'] . '/hesk/attachments');
+$attach_dir = str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['DOCUMENT_ROOT'] . '/hesk346/attachments');
 
 try {
     // Validasi direktori lampiran
