@@ -673,8 +673,20 @@ class _HomePageState extends State<HomePage> {
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
                       SnackBar(
-                        content: Text(message),
+                        content: Text(
+                          message,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                         duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     );
                 },
