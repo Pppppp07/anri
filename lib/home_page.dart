@@ -588,6 +588,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               Expanded(
                 child: TextField(
+                  // ... properti TextField tetap sama
                   controller: _searchController,
                   focusNode: _searchFocusNode,
                   decoration: InputDecoration(
@@ -613,6 +614,43 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(width: 8),
+              // 1. Tombol Filter (Sekarang di depan)
+              IconButton(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      Icons.filter_list_alt,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 28,
+                    ),
+                    if (_areAdvancedFiltersActive)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(1),
+                          decoration: BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            size: 11,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                onPressed: _showFilterDialog,
+                tooltip: 'Filter Lanjutan',
+              ),
+              // 2. Tombol Urutkan (Sekarang di belakang)
               IconButton(
                 icon: AnimatedRotation(
                   turns: ticketProvider.currentSortType == SortType.byPriority
@@ -644,15 +682,6 @@ class _HomePageState extends State<HomePage> {
                     ? 'Urutkan berdasarkan Prioritas'
                     : 'Urutkan berdasarkan Terbaru',
                 iconSize: 28,
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.filter_list_alt,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 28,
-                ),
-                onPressed: _showFilterDialog,
-                tooltip: 'Filter Lanjutan',
               ),
             ],
           ),
@@ -759,6 +788,21 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  bool get _areAdvancedFiltersActive {
+    // Cek apakah di halaman Beranda atau Riwayat
+    if (_selectedIndex == 0) {
+      // Halaman Beranda
+      // Filter dianggap aktif jika kategori atau prioritas BUKAN 'All'
+      return _homeCategory != 'All' || _homePriority != 'All';
+    } else if (_selectedIndex == 1) {
+      // Halaman Riwayat
+      // Sama, filter aktif jika kategori atau prioritas BUKAN 'All'
+      return _historyCategory != 'All' || _historyPriority != 'All';
+    }
+    // Tidak ada filter untuk halaman lain
+    return false;
   }
 
   void _showFilterDialog() {

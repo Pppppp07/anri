@@ -123,31 +123,42 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       final headers = await _getAuthHeaders();
       if (headers.isEmpty) return;
 
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}'),
-        headers: headers,
-      ).timeout(const Duration(seconds: 4));
+      final response = await http
+          .get(
+            Uri.parse(
+              '${ApiConfig.baseUrl}/get_ticket_details.php?id=${widget.ticket.id}',
+            ),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 4));
 
       if (!mounted || response.statusCode != 200) return;
 
       final data = json.decode(response.body);
       if (data['success'] == true && data['replies'] != null) {
         final List<dynamic> newRepliesData = data['replies'];
-        
+
         // --- PERBAIKAN UTAMA DI SINI ---
         // Cek jika jumlah balasan BERBEDA (bisa bertambah atau berkurang)
         if (newRepliesData.length != _replies.length) {
-          print('Perubahan riwayat balasan terdeteksi! Memperbarui tampilan...');
-          
+          print(
+            'Perubahan riwayat balasan terdeteksi! Memperbarui tampilan...',
+          );
+
           final List<Attachment> attachments = (data['attachments'] as List)
               .map((attJson) => Attachment.fromJson(attJson))
               .toList();
-          final newTicketData = Ticket.fromJson(data['ticket_details'], attachments: attachments);
-          
+          final newTicketData = Ticket.fromJson(
+            data['ticket_details'],
+            attachments: attachments,
+          );
+
           setState(() {
             _currentTicket = newTicketData;
-            _replies = newRepliesData.map((data) => Reply.fromJson(data)).toList();
-            _initializeState(); 
+            _replies = newRepliesData
+                .map((data) => Reply.fromJson(data))
+                .toList();
+            _initializeState();
           });
         }
       }
@@ -353,10 +364,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
     for (var file in _pickedFiles) {
       request.files.add(
-        await http.MultipartFile.fromPath(
-          'attachments[]',
-          file.path,
-        ),
+        await http.MultipartFile.fromPath('attachments[]', file.path),
       );
     }
 
@@ -1191,107 +1199,112 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Widget _buildReplyForm() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    if (_pickedFiles.isNotEmpty) ...[
+      Container(
+        height: 100,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Theme.of(context).dividerColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ListView.builder(
+          itemCount: _pickedFiles.length,
+          itemBuilder: (context, index) {
+            final file = _pickedFiles[index];
+            return ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(
+                file.path.split('/').last,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () => _removeFile(index),
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+    TextFormField(
+      controller: _replyMessageController,
+      decoration: const InputDecoration(
+        hintText: 'Ketik balasan Anda...',
+        border: OutlineInputBorder(),
+      ),
+      maxLines: 6,
+    ),
+    const SizedBox(height: 16),
+
+    // --- AWAL PERUBAHAN TATA LETAK ---
+
+    // Dropdown sekarang mengambil satu baris penuh
+    DropdownButtonFormField<String>(
+      value: _submitAsAction,
+      items: _submitAsOptions
+          .map(
+            (v) => DropdownMenuItem<String>(
+              value: v,
+              child: Text(
+                v,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _getStatusColor(v),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(() {
+        if (v != null) _submitAsAction = v;
+      }),
+      decoration: const InputDecoration(
+        labelText: 'Submit sebagai',
+        border: OutlineInputBorder(),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      ),
+    ),
+
+    const SizedBox(height: 12),
+
+    // Tombol-tombol berada di baris baru, rata kanan
+    Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        if (_pickedFiles.isNotEmpty) ...[
-          Container(
-            height: 100,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).dividerColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ListView.builder(
-              itemCount: _pickedFiles.length,
-              itemBuilder: (context, index) {
-                final file = _pickedFiles[index];
-                return ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: Text(
-                    file.path.split('/').last,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => _removeFile(index),
-                  ),
-                );
-              },
+        IconButton(
+          icon: const Icon(Icons.attach_file),
+          onPressed: _pickFiles,
+          tooltip: 'Lampirkan File',
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton.icon(
+          onPressed: _isSubmittingReply ? null : _submitReply,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
             ),
           ),
-        ],
-        TextFormField(
-          controller: _replyMessageController,
-          decoration: const InputDecoration(
-            hintText: 'Ketik balasan Anda...',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 6,
+          icon: _isSubmittingReply
+              ? Container(
+                  width: 24,
+                  height: 24,
+                  padding: const EdgeInsets.all(2.0),
+                  child: const CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+              : const Icon(Icons.send),
+          label: const Text('Submit'),
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _submitAsAction,
-                items: _submitAsOptions
-                    .map(
-                      (v) => DropdownMenuItem<String>(
-                        value: v,
-                        child: Text(
-                          v,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _getStatusColor(v),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  if (v != null) _submitAsAction = v;
-                }),
-                decoration: const InputDecoration(
-                  labelText: 'Submit sebagai',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-              ),
-            ),
-            
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.attach_file),
-              onPressed: _pickFiles,
-              tooltip: 'Lampirkan File',
-              padding: const EdgeInsets.all(12),
-              constraints: const BoxConstraints(),
-            ),
-            ElevatedButton(
-              onPressed: _isSubmittingReply ? null : _submitReply,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                minimumSize: const Size(0, 58),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-              ),
-              child: _isSubmittingReply
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Submit'),
-            ),
-          ],
-        ),
+      ],
+    ),
       ],
     );
   }

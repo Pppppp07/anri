@@ -1,5 +1,3 @@
-// GANTIKAN SELURUH ISI FILE anri_helpdesk-main/lib/main.dart ANDA DENGAN KODE INI
-
 import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
