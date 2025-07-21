@@ -264,10 +264,20 @@ class _SettingsPageState extends State<SettingsPage> {
 
               // Tampilkan pesan sukses
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text(
                     'Cache berhasil dihapus! Anda telah logout.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
                   ),
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  duration: const Duration(seconds: 3), // Sesuaikan durasi jika perlu
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 ),
               );
 
