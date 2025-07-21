@@ -1070,51 +1070,63 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildErrorState(String rawError) {
     final errorInfo = ErrorIdentifier.from(rawError);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.wifi_off_outlined, size: 80, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            const Text(
-              'Gagal Memuat Data',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              errorInfo.userMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _triggerSearch,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
-            ),
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ErrorPage(
-                    message: errorInfo.userMessage,
-                    referenceCode: errorInfo.referenceCode,
-                  ),
+    // 1. Bungkus dengan LayoutBuilder dan SingleChildScrollView untuk responsivitas
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 2. Kecilkan ukuran ikon dan teks agar muat di layar kecil
+                    Icon(Icons.wifi_off_outlined, size: 64, color: Colors.red.shade300),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Gagal Memuat Data',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      errorInfo.userMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 15, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _triggerSearch,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Coba Lagi'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ErrorPage(
+                            message: errorInfo.userMessage,
+                            referenceCode: errorInfo.referenceCode,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('Lihat Detail Error'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              icon: const Icon(Icons.info_outline),
-              label: const Text('Lihat Detail Error'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey.shade700,
-              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
