@@ -1,19 +1,19 @@
+// lib/home_page.dart
+
 import 'dart:async';
-import 'dart:convert';
 import 'package:anri/services/firebase_api.dart';
-import 'package:anri/config/api_config.dart';
 import 'package:anri/pages/error_page.dart';
 import 'package:anri/pages/home/widgets/ticket_card.dart';
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/pages/notification_page.dart';
 import 'package:anri/pages/profile_page.dart';
-import 'package:anri/providers/notification_provider.dart'; // <-- PERBAIKAN UTAMA: IMPORT YANG HILANG
+import 'package:anri/providers/app_data_provider.dart';
+import 'package:anri/providers/notification_provider.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
 import 'package:anri/utils/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,7 +41,6 @@ class _HomePageState extends State<HomePage> {
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounce;
   Timer? _autoRefreshTimer;
-  List<String> _teamMembers = ['Unassigned'];
 
   final ScrollController _scrollController = ScrollController();
   TicketView _currentView = TicketView.all;
@@ -52,25 +51,6 @@ class _HomePageState extends State<HomePage> {
   String _homePriority = 'All';
   String _historyCategory = 'All';
   String _historyPriority = 'All';
-
-  final Map<String, String> _categories = {
-    'All': 'Semua Kategori',
-    '1': 'Aplikasi Sistem Informasi',
-    '2': 'SRIKANDI',
-    '3': 'Layanan Kepegawaian',
-    '4': 'Perangkat Lunak',
-    '5': 'Perangkat Keras',
-    '6': 'Jaringan Komputer',
-    '7': 'Bangunan',
-    '8': 'Mesin dan AC',
-    '9': 'Listrik',
-    '10': 'Kendaraan Dinas',
-    '11': 'Pengembalian BMN',
-    '12': 'Insiden Siber',
-    '13': 'Pusat Data Nasional',
-    '14': 'CCTV',
-    '15': 'Email Dinas',
-  };
 
   final List<String> _statusHeaderFilters = [
     'Semua Status',
@@ -96,12 +76,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Panggil initNotifications tanpa await agar tidak memblokir UI
       context.read<FirebaseApi>().initNotifications();
+      context.read<AppDataProvider>().fetchTeamMembers();
       _triggerSearch();
-      _fetchTeamMembers();
       _startAutoRefreshTimer();
     });
 
@@ -113,26 +92,17 @@ class _HomePageState extends State<HomePage> {
     });
 
     _scrollController.addListener(() {
-      if (!_scrollController.hasClients) {
-        return;
-      }
+      if (!_scrollController.hasClients) return;
+
       final direction = _scrollController.position.userScrollDirection;
       final offset = _scrollController.position.pixels;
 
       if (offset < 200) {
-        if (_fabState != FabState.hidden) {
-          setState(() => _fabState = FabState.hidden);
-        }
-        return;
-      }
-      if (direction == ScrollDirection.reverse) {
-        if (_fabState != FabState.filter) {
-          setState(() => _fabState = FabState.filter);
-        }
+        if (_fabState != FabState.hidden) setState(() => _fabState = FabState.hidden);
+      } else if (direction == ScrollDirection.reverse) {
+        if (_fabState != FabState.filter) setState(() => _fabState = FabState.filter);
       } else if (direction == ScrollDirection.forward) {
-        if (_fabState != FabState.scrollToTop) {
-          setState(() => _fabState = FabState.scrollToTop);
-        }
+        if (_fabState != FabState.scrollToTop) setState(() => _fabState = FabState.scrollToTop);
       }
     });
   }
@@ -148,12 +118,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _triggerSearch() {
-    // Pastikan widget masih ada di tree
     if (!mounted) return;
-    final String assigneeParam = _currentView == TicketView.assignedToMe
-        ? widget.currentUserName
-        : '';
-    final bool isHomePage = _selectedIndex == 0;
+    final assigneeParam = _currentView == TicketView.assignedToMe ? widget.currentUserName : '';
+    final isHomePage = _selectedIndex == 0;
 
     context.read<TicketProvider>().fetchTickets(
       status: _getStatusForAPI(),
@@ -166,65 +133,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _getStatusForAPI() {
-    if (_selectedIndex == 1) {
-      return 'Resolved';
-    }
-    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe) {
-      return 'Active';
-    }
-    if (_selectedStatus == 'Semua Status') {
-      return 'All';
-    }
+    if (_selectedIndex == 1) return 'Resolved';
+    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe) return 'Active';
+    if (_selectedStatus == 'Semua Status') return 'All';
     return _selectedStatus;
   }
 
-  Future<Map<String, String>> _getAuthHeaders() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('auth_token');
-    if (token == null) {
-      if (mounted) {
-        _logout(message: 'Sesi tidak valid. Silakan login kembali.');
-      }
-      return {};
-    }
-    return {'Authorization': 'Bearer $token'};
-  }
-
-  Future<void> _fetchTeamMembers() async {
-    final headers = await _getAuthHeaders();
-    if (!mounted || headers.isEmpty) return;
-
-    try {
-      final url = Uri.parse('${ApiConfig.baseUrl}/get_users.php');
-      final response = await http
-          .get(url, headers: headers)
-          .timeout(const Duration(seconds: 15));
-
-      if (!mounted) return;
-      
-      if (response.statusCode == 401) {
-        _logout(message: 'Sesi tidak valid.');
-        return;
-      }
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success'] == true) {
-          final List<dynamic> data = responseData['data'];
-          final List<String> fetchedMembers = data
-              .map((user) => user['name'].toString())
-              .toList();
-          setState(() => _teamMembers = fetchedMembers.isNotEmpty ? fetchedMembers : ['Unassigned']);
-        }
-      }
-    } catch (e) {
-      debugPrint("Gagal mengambil daftar tim: $e");
-    }
-  }
-
   Future<void> _logout({String? message}) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final bool rememberMe = prefs.getBool('rememberMe') ?? false;
-    final String? username = prefs.getString('user_username');
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('rememberMe') ?? false;
+    final username = prefs.getString('user_username');
 
     await prefs.clear();
 
@@ -255,7 +173,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint("Auto refresh is OFF");
       return;
     }
-    
+
     _autoRefreshTimer = Timer.periodic(settingsProvider.refreshInterval, (timer) {
       if (!mounted) {
         timer.cancel();
@@ -263,17 +181,14 @@ class _HomePageState extends State<HomePage> {
       }
 
       final ticketProvider = context.read<TicketProvider>();
-      final bool shouldRefresh =
-          _selectedIndex != 2 &&
+      final shouldRefresh = _selectedIndex != 2 &&
           _searchController.text.isEmpty &&
           ticketProvider.listState != ListState.loading &&
           !ticketProvider.isLoadingMore;
 
       if (shouldRefresh) {
-        final String assigneeParam = _currentView == TicketView.assignedToMe
-            ? widget.currentUserName
-            : '';
-        final bool isHomePage = _selectedIndex == 0;
+        final assigneeParam = _currentView == TicketView.assignedToMe ? widget.currentUserName : '';
+        final isHomePage = _selectedIndex == 0;
         ticketProvider.fetchTickets(
           status: _getStatusForAPI(),
           category: isHomePage ? _homeCategory : _historyCategory,
@@ -328,27 +243,20 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     return Scaffold(
-appBar: _selectedIndex != 2
+      appBar: _selectedIndex != 2
           ? AppBar(
               title: _buildAppBarTitle(),
               actions: _selectedIndex == 0
                   ? [
-                      // --- PERUBAHAN DIMULAI DI SINI ---
-                      // Kita menggunakan Consumer agar hanya ikon ini yang diperbarui
-                      // saat ada notifikasi baru, bukan seluruh halaman.
                       Consumer<NotificationProvider>(
                         builder: (context, notifProvider, child) {
                           return Badge(
-                            // Tampilkan badge hanya jika ada notifikasi belum dibaca
                             isLabelVisible: notifProvider.unreadCount > 0,
-                            // Tampilkan jumlah notifikasi sebagai label
                             label: Text(notifProvider.unreadCount.toString()),
-                            // Widget yang akan diberi badge adalah IconButton
                             child: IconButton(
                               icon: const Icon(Icons.notifications_none_outlined),
                               tooltip: 'Notifikasi',
                               onPressed: () {
-                                // Saat ikon ditekan, navigasi ke halaman notifikasi
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -360,9 +268,6 @@ appBar: _selectedIndex != 2
                           );
                         },
                       ),
-                      // --- AKHIR PERUBAHAN ---
-
-                      // Teks sapaan untuk user
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.only(right: 16.0),
@@ -373,9 +278,9 @@ appBar: _selectedIndex != 2
                         ),
                       ),
                     ]
-                  : null, // Jangan tampilkan actions jika bukan di halaman beranda
+                  : null,
             )
-          : null, // Jangan tampilkan AppBar sama sekali di halaman profil
+          : null,
       body: Stack(
         children: [
           if (_selectedIndex != 2)
@@ -452,24 +357,22 @@ appBar: _selectedIndex != 2
           foregroundColor: Theme.of(context).colorScheme.onPrimary,
           child: const Icon(Icons.arrow_upward),
         );
-      // --- [PERBAIKAN] Menghapus 'default' yang redudan ---
       case FabState.hidden:
         return const SizedBox.shrink(key: ValueKey('hidden'));
     }
   }
 
+  // Ganti seluruh method _buildBody dengan ini
   Widget _buildBody() {
+    final appDataProvider = context.watch<AppDataProvider>();
+
     switch (_selectedIndex) {
       case 0:
       case 1:
         return RefreshIndicator(
           onRefresh: () async {
             if (_fabState != FabState.hidden) {
-              await _scrollController.animateTo(
-                0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-              );
+              await _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
             }
             _triggerSearch();
           },
@@ -481,18 +384,11 @@ appBar: _selectedIndex != 2
                 builder: (context, provider, child) {
                   switch (provider.listState) {
                     case ListState.loading:
-                      return const SliverFillRemaining(
-                        child: Center(child: CircularProgressIndicator()),
-                      );
+                      return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
                     case ListState.error:
-                      return SliverFillRemaining(
-                        child: _buildErrorState(provider.errorMessage),
-                      );
+                      return SliverFillRemaining(child: _buildErrorState(provider.errorMessage));
                     case ListState.empty:
-                      return SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _buildEmptyState(),
-                      );
+                      return SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState());
                     case ListState.hasData:
                       return SliverList(
                         delegate: SliverChildBuilderDelegate(
@@ -502,11 +398,8 @@ appBar: _selectedIndex != 2
                               return TicketCard(
                                 key: ValueKey(ticket.id),
                                 ticket: ticket,
-                                allCategories: _categories.entries
-                                    .where((e) => e.key != 'All')
-                                    .map((e) => e.value)
-                                    .toList(),
-                                allTeamMembers: _teamMembers,
+                                allCategories: appDataProvider.categoryListForDropdown,
+                                allTeamMembers: appDataProvider.teamMembers,
                                 currentUserName: widget.currentUserName,
                                 onRefresh: _triggerSearch,
                               );
@@ -514,9 +407,7 @@ appBar: _selectedIndex != 2
                               return _buildPaginationControl(provider);
                             }
                           },
-                          childCount:
-                              provider.tickets.length +
-                              (provider.hasMore ? 1 : 0),
+                          childCount: provider.tickets.length + (provider.hasMore ? 1 : 0),
                         ),
                       );
                   }
@@ -699,8 +590,6 @@ appBar: _selectedIndex != 2
                 children: _statusHeaderFilters.map((status) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
-
-                    // lib/home_page.dart -> di dalam metode _buildHeaderFilterBar
                     child: ChoiceChip(
                       label: Text(status),
                       selected: _selectedStatus == status,
@@ -710,48 +599,26 @@ appBar: _selectedIndex != 2
                           _triggerSearch();
                         }
                       },
-
-                      // --- [AWAL BLOK PERBAIKAN VISUAL] ---
-
-                      // Tampilkan ikon centang pada chip yang aktif untuk kejelasan ekstra.
                       showCheckmark: true,
-
-                      // Atur warna centang agar kontras dengan latar belakang chip aktif.
                       checkmarkColor: Theme.of(
                         context,
                       ).colorScheme.onPrimaryContainer,
-
-                      // Warna latar untuk chip yang TIDAK AKTIF. Gunakan warna surface yang lebih netral.
                       backgroundColor: Theme.of(context).colorScheme.surface,
-
-                      // Warna latar untuk chip yang AKTIF. Warna ini sudah cukup baik.
                       selectedColor: Theme.of(
                         context,
                       ).colorScheme.primaryContainer,
-
-                      // Atur gaya teks label.
                       labelStyle: TextStyle(
                         color: _selectedStatus == status
                             ? Theme.of(context).colorScheme.onPrimaryContainer
                             : Theme.of(context).textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.w500,
                       ),
-
-                      // Pengaturan garis pinggir (border) yang lebih jelas.
                       side: BorderSide(
-                        // Jika chip aktif, beri border warna primary yang tebal.
-                        // Jika tidak aktif, beri border warna abu-abu (outline) yang standar.
                         color: _selectedStatus == status
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(
-                                context,
-                              ).colorScheme.outline.withOpacity(0.5),
-
-                        // Atur ketebalan border.
+                            : Theme.of(context).colorScheme.outline.withOpacity(0.5),
                         width: 1.0,
                       ),
-
-                      // --- [AKHIR BLOK PERBAIKAN VISUAL] ---
                     ),
                   );
                 }).toList(),
@@ -764,27 +631,23 @@ appBar: _selectedIndex != 2
     );
   }
 
+  // Ganti seluruh method _showFilterDialog dengan ini
   void _showFilterDialog() {
-    final bool isHomePage = _selectedIndex == 0;
+    final appDataProvider = context.read<AppDataProvider>();
+    final isHomePage = _selectedIndex == 0;
     String tempCategory = isHomePage ? _homeCategory : _historyCategory;
     String tempStatus = _selectedStatus;
     String tempPriority = isHomePage ? _homePriority : _historyPriority;
+
     Color getStatusColor(String status) {
       switch (status) {
-        case 'New':
-          return const Color(0xFFD32F2F);
-        case 'Waiting Reply':
-          return const Color(0xFFE65100);
-        case 'Replied':
-          return const Color(0xFF1976D2);
-        case 'In Progress':
-          return const Color(0xFF673AB7);
-        case 'On Hold':
-          return const Color(0xFFC2185B);
-        case 'Resolved':
-          return const Color(0xFF388E3C);
-        default:
-          return Colors.grey.shade700;
+        case 'New': return const Color(0xFFD32F2F);
+        case 'Waiting Reply': return const Color(0xFFE65100);
+        case 'Replied': return const Color(0xFF1976D2);
+        case 'In Progress': return const Color(0xFF673AB7);
+        case 'On Hold': return const Color(0xFFC2185B);
+        case 'Resolved': return const Color(0xFF388E3C);
+        default: return Colors.grey.shade700;
       }
     }
 
@@ -897,7 +760,7 @@ appBar: _selectedIndex != 2
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: 12),
                       ),
-                      items: _categories.entries
+                      items: appDataProvider.categories.entries
                           .map(
                             (entry) => DropdownMenuItem<String>(
                               value: entry.key,

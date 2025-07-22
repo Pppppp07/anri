@@ -142,12 +142,14 @@ class TicketProvider with ChangeNotifier {
       return;
     }
 
-    if (isRefresh) {
-      _currentPage = 1;
-      _hasMore = true;
-      _listState = ListState.loading;
-      notifyListeners();
-    }
+    Future.microtask(() {
+      if (isRefresh) {
+        _currentPage = 1;
+        _hasMore = true;
+        _listState = ListState.loading;
+        notifyListeners();
+      }
+    });
 
     try {
       final newTickets = await _fetchPage(

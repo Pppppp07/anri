@@ -1,8 +1,11 @@
+// lib/services/firebase_api.dart
+
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
 import 'package:anri/main.dart';
 import 'package:anri/models/ticket_model.dart';
 import 'package:anri/pages/ticket_detail_screen.dart';
+import 'package:anri/providers/app_data_provider.dart';
 import 'package:anri/providers/notification_provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Fungsi helper _getAuthHeaders tetap sama
 Future<Map<String, String>> _getAuthHeaders() async {
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? token = prefs.getString('auth_token');
@@ -18,6 +22,8 @@ Future<Map<String, String>> _getAuthHeaders() async {
 
 class FirebaseApi {
   final _firebaseMessaging = FirebaseMessaging.instance;
+
+  // Method initNotifications dan _sendTokenToServer tetap sama
 
   Future<void> initNotifications() async {
     await _firebaseMessaging.requestPermission();
@@ -44,26 +50,38 @@ class FirebaseApi {
     }
   }
 
-  // --- FUNGSI BARU: KHUSUS UNTUK NAVIGASI ---
-  Future<void> navigateToTicketDetail(String ticketId) async {
-    if (ticketId == '0') return;
+  // Ganti seluruh method navigateToTicketDetail dengan ini
+ Future<void> navigateToTicketDetail(String ticketId) async {
+    if (ticketId == '0' || navigatorKey.currentContext == null) return;
     
-    debugPrint('Navigasi ke tiket ID: $ticketId');
-    final context = navigatorKey.currentContext;
-    if (context == null || !context.mounted) return;
+    final context = navigatorKey.currentContext!;
 
     try {
-      final headers = await _getAuthHeaders();
+      final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+      
+      final results = await Future.wait([
+        appDataProvider.fetchTeamMembers(), // Pastikan data siap
+        _getAuthHeaders(),
+        SharedPreferences.getInstance(),
+      ]);
+
+      if (!context.mounted) return;
+
+      final headers = results[1] as Map<String, String>;
       if (headers.isEmpty) return;
+      
+      final prefs = results[2] as SharedPreferences;
+      final currentUserName = prefs.getString('user_name') ?? 'Unknown';
+
       final url = Uri.parse('${ApiConfig.baseUrl}/get_ticket_details.php?id=$ticketId');
       final response = await http.get(url, headers: headers);
+      
+      if (!context.mounted) return;
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true && data['ticket_details'] != null) {
-          final prefs = await SharedPreferences.getInstance();
-          final currentUserName = prefs.getString('user_name') ?? 'Unknown';
-
+          
           final List<Attachment> attachments = (data['attachments'] as List)
               .map((attJson) => Attachment.fromJson(attJson))
               .toList();
@@ -74,8 +92,8 @@ class FirebaseApi {
             MaterialPageRoute(
               builder: (context) => TicketDetailScreen(
                 ticket: ticket,
-                allCategories: const [],
-                allTeamMembers: const [],
+                allCategories: appDataProvider.categoryListForDropdown,
+                allTeamMembers: appDataProvider.teamMembers,
                 currentUserName: currentUserName,
               ),
             ),
@@ -87,7 +105,6 @@ class FirebaseApi {
     }
   }
 
-  // Fungsi ini sekarang HANYA untuk menyimpan dan memicu navigasi
   void handleMessage(RemoteMessage? message) {
     if (message == null) return;
     
@@ -103,7 +120,6 @@ class FirebaseApi {
   }
 
   Future initPushNotifications() async {
-    // Menangani notifikasi saat aplikasi TERBUKA (Foreground)
     FirebaseMessaging.onMessage.listen((message) {
       debugPrint('[FIREBASE API] Notifikasi Foreground diterima: ${message.notification?.title}');
       
@@ -123,10 +139,7 @@ class FirebaseApi {
       }
     });
 
-    // Menangani notifikasi yang diketuk saat aplikasi TERTUTUP (Terminated)
-    FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
-
-    // Menangani notifikasi yang diketuk saat aplikasi di BACKGROUND
+    // FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
   }
 }
