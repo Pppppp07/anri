@@ -18,6 +18,7 @@
 .pub-cache/
 .pub/
 /build/
+/lib/firebase_options.dart
 
 # iOS
 /ios/Flutter/App.framework
@@ -59,3 +60,5 @@
 
 # Secret files - Tambahkan file sensitif Anda di sini
 .env
+.firebase.json
+.pubspec.lock
