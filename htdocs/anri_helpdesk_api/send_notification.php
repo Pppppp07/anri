@@ -1,6 +1,6 @@
 <?php
 /**
- * File: send_notification.php (Versi Final dengan Perbaikan Autoloader)
+ * File: send_notification.php (Versi Final dengan Payload Data Saja)
  * Deskripsi: Skrip ini HANYA untuk dijalankan dari command line (CLI) oleh sistem HESK
  * untuk mengirim notifikasi push FCM ke satu pengguna pada satu waktu.
  */
@@ -29,11 +29,8 @@ $title     = $argv[2];
 $body      = $argv[3];
 $ticket_id = $argv[4];
 
-// =================================================================
-// --- AWAL BLOK PERBAIKAN ---
 // Muat semua dependensi SEBELUM memanggil file lain yang membutuhkannya.
 require_once __DIR__ . '/vendor/autoload.php';
-// --- AKHIR BLOK PERBAIKAN ---
 
 // Sekarang kita bisa memuat koneksi.php dengan aman karena Dotenv sudah tersedia.
 require_once __DIR__ . '/koneksi.php'; 
@@ -89,12 +86,17 @@ function send_fcm_notification_final(mysqli $conn, int $user_id, string $title, 
 
     $fcmApiUrl = 'https://fcm.googleapis.com/v1/projects/' . $projectId . '/messages:send';
 
-    // 3. Buat Payload Notifikasi.
+    // 3. Buat Payload Notifikasi. (*** INI BAGIAN YANG DIUBAH ***)
     $message = [
         'message' => [
             'token' => $token,
-            'notification' => ['title' => $title, 'body' => $body],
-            'data' => ['click_action' => 'FLUTTER_NOTIFICATION_CLICK', 'ticket_id' => (string)$ticket_id]
+            // 'notification' key DIHAPUS.
+            'data' => [
+                'title' => $title, // title dipindahkan ke dalam 'data'
+                'body' => $body,   // body dipindahkan ke dalam 'data'
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK', 
+                'ticket_id' => (string)$ticket_id
+            ]
         ]
     ];
     log_fcm_activity("Payload dibuat: " . json_encode($message));

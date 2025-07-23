@@ -28,7 +28,10 @@ hesk_check_kb_only();
 hesk_load_database_functions();
 require(HESK_PATH . 'inc/email_functions.inc.php');
 require(HESK_PATH . 'inc/posting_functions.inc.php');
-
+// Custom ANRI functions
+if (file_exists(HESK_PATH . 'anri_custom_functions.inc.php')) {
+    require(HESK_PATH . 'anri_custom_functions.inc.php');
+}
 // We only allow POST requests to this file
 if ( $_SERVER['REQUEST_METHOD'] != 'POST' )
 {
@@ -545,7 +548,7 @@ if ($hesk_settings['notify_new'] && $email_available) { hesk_notifyCustomer(); }
 // >>> AWAL NOTIFIKASI TAMBAHAN<<<
 $event = $ticket['owner'] ? 'new_assigned' : 'new_unassigned';
 $actor_id = isset($_SESSION['id']) ? $_SESSION['id'] : 0; // 0 jika pelanggan
-anri_kirim_semua_notifikasi($event, $ticket, $actor_id);
+anri_kirim_semua_notifikasi($hesk_settings,$event, $ticket, $actor_id);
 // >>> AKHIR NOTIFIKASI TAMBAHAN <<<
 
 // Next ticket show suggested articles again

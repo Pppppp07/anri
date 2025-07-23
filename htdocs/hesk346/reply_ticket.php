@@ -235,7 +235,7 @@ if ($ticket['owner']) {
 
 // >>> AWAL BLOK NOTIFIKASI PUSH <<<
 if (function_exists('anri_kirim_semua_notifikasi')) {
-    anri_kirim_semua_notifikasi('reply_customer', $ticket_for_notification, 0, $raw_message_for_notification);
+    anri_kirim_semua_notifikasi($hesk_settings,'reply_customer', $ticket_for_notification, 0, $raw_message_for_notification);
 }
 // --- AKHIR BLOK NOTIFIKASI PUSH ---
 
