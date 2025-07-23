@@ -1,9 +1,22 @@
 <?php
-require 'cors_handler.php';
+// TAMBAHKAN FUNGSI INI DI BAGIAN PALING ATAS
+// if (!function_exists('write_log')) {
+//     function write_log($log_msg) {
+//         // Log akan disimpan di file _debug_log.txt di dalam folder API Anda
+//         $log_file = __DIR__ . '/_debug_log.txt';
+//         $timestamp = date('Y-m-d H:i:s');
+//         // Menambahkan pesan log ke file dengan format [TIMESTAMP] PESAN
+//         file_put_contents($log_file, "[$timestamp] " . $log_msg . PHP_EOL, FILE_APPEND);
+//     }
+// }
+// --- HEADER WAJIB UNTUK SEMUA ENDPOINT YANG BUTUH LOGIN ---
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/cors_handler.php';
 ob_start();
-require 'auth_check.php';
-require 'koneksi.php';
 
+// Panggil auth_check.php. File ini sudah memanggil koneksi.php (yang berisi write_log).
+require_once __DIR__ . '/auth_check.php';
+// --- AKHIR HEADER WAJIB ---
 $response = ['success' => false, 'data' => [], 'message' => 'Gagal mengambil data tiket.'];
 
 try {

@@ -1,14 +1,12 @@
 <?php
-/**
- * update_ticket.php
- * VERSI FINAL - Dengan Logika Prioritas yang Benar dan Notifikasi Status (dengan Link)
- */
-
+// --- HEADER WAJIB UNTUK SEMUA ENDPOINT YANG BUTUH LOGIN ---
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/cors_handler.php';
 ob_start();
 
-require 'vendor/autoload.php';
-require 'koneksi.php';
-require 'auth_check.php';
+// Panggil auth_check.php. File ini sudah memanggil koneksi.php (yang berisi write_log).
+require_once __DIR__ . '/auth_check.php';
+// --- AKHIR HEADER WAJIB ---
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;

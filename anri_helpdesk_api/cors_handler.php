@@ -1,23 +1,32 @@
 <?php
-// File ini akan menjadi satu-satunya sumber untuk pengaturan header CORS di seluruh aplikasi.
+// File: cors_handler.php (Versi dengan Perekam Error)
 
-// Izinkan permintaan dari origin manapun. Untuk produksi, ganti '*' dengan domain frontend Anda.
-// Contoh: header("Access-Control-Allow-Origin: https://helpdesk.anri.go.id");
-header("Access-Control-Allow-Origin: *");
+// =================================================================
+// --- KODE PEREKAM ERROR (WAJIB ADA DI PALING ATAS) ---
+// =================================================================
+// Jangan tampilkan error ke browser, ini akan merusak JSON
+ini_set('display_errors', 0);
+// Aktifkan pencatatan error ke dalam file
+ini_set('log_errors', 1);
+// Tentukan nama file log. File ini akan muncul di dalam folder 'anri_helpdesk_api'
+ini_set('error_log', __DIR__ . '/api_error_log.txt');
+// Pastikan SEMUA jenis error (termasuk Fatal Error) akan dicatat
+error_reporting(E_ALL);
+// =================================================================
 
-// Izinkan metode HTTP yang diperlukan oleh aplikasi.
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 
-// Izinkan header kustom yang dikirim oleh Flutter, terutama 'Authorization' untuk token.
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+// --- Kode CORS Asli Anda (Tetap Diperlukan) ---
+if (php_sapi_name() !== 'cli') {
 
-// Tangani Pre-flight Request dari browser.
-// Jika metode request adalah OPTIONS, kirim header di atas dan hentikan eksekusi.
-// Ini adalah "jawaban izin" yang ditunggu oleh browser.
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    // Kirim response 204 (No Content) yang berarti "izin diberikan, silakan lanjutkan".
-    http_response_code(204);
-    // Hentikan skrip agar tidak melanjutkan ke logika otentikasi/database.
-    exit();
+    header("Access-Control-Allow-Origin: *");
+
+    header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+
+    if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+        http_response_code(204);
+        exit();
+    }
 }
 ?>

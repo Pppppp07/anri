@@ -1,15 +1,12 @@
 <?php
-/**
- * File: update_fcm_token.php
- * Deskripsi: Endpoint untuk menerima dan menyimpan FCM token dari aplikasi Flutter ke database.
- */
+// --- HEADER WAJIB UNTUK SEMUA ENDPOINT YANG BUTUH LOGIN ---
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/cors_handler.php';
+ob_start();
 
-// Sertakan CORS handler untuk konsistensi.
-require 'cors_handler.php';
-
-// Amankan endpoint ini. Hanya pengguna yang sudah login yang bisa memperbarui tokennya.
-require 'auth_check.php'; 
-require 'koneksi.php';
+// Panggil auth_check.php. File ini sudah memanggil koneksi.php (yang berisi write_log).
+require_once __DIR__ . '/auth_check.php';
+// --- AKHIR HEADER WAJIB ---
 
 // Set header output sebagai JSON.
 header('Content-Type: application/json');
