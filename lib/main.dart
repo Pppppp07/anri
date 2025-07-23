@@ -1,79 +1,69 @@
+// lib/main.dart
+
+import 'dart:convert';
+import 'package:anri/models/notification_model.dart';
 import 'package:anri/pages/splash_screen.dart';
+import 'package:anri/providers/app_data_provider.dart';
+import 'package:anri/providers/notification_provider.dart';
 import 'package:anri/providers/settings_provider.dart';
 import 'package:anri/providers/theme_provider.dart';
 import 'package:anri/providers/ticket_provider.dart';
+import 'package:anri/services/firebase_api.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint("Notifikasi Background Diterima: ${message.messageId}");
+  try {
+    final newNotification = NotificationModel.fromRemoteMessage(message);
+    final prefs = await SharedPreferences.getInstance();
+    const historyKey = 'notification_history';
+    final List<String> notificationsJson = prefs.getStringList(historyKey) ?? [];
+    notificationsJson.insert(0, json.encode(newNotification.toJson()));
+    if (notificationsJson.length > 50) {
+      notificationsJson.removeLast();
+    }
+    await prefs.setStringList(historyKey, notificationsJson);
+    const unreadCountKey = 'notification_unread_count';
+    int unreadCount = prefs.getInt(unreadCountKey) ?? 0;
+    unreadCount++;
+    await prefs.setInt(unreadCountKey, unreadCount);
+    debugPrint("Notifikasi background BERHASIL DISIMPAN ke SharedPreferences.");
+  } catch (e) {
+    debugPrint("Gagal menyimpan notifikasi background: $e");
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await initializeDateFormatting('id_ID', null);
   await dotenv.load(fileName: ".env");
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     debugPrint(details.toString());
-    return Material(
-      child: Container(
-        color: const Color(0xFF212f3c),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.orangeAccent,
-                  size: 60,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Oops, Terjadi Masalah Saat Membangun Tampilan',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Silakan coba restart aplikasi. Jika masalah berlanjut, hubungi developer dengan informasi error di bawah ini.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[400]),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    details.exception.toString(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return Material(/* ... Error Widget Anda ... */);
   };
-
+  
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => TicketProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => AppDataProvider()),
+        Provider<FirebaseApi>(create: (_) => FirebaseApi()),
       ],
       child: const MyApp(),
     ),
@@ -88,6 +78,7 @@ class MyApp extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Helpdesk Mobile',
       themeMode: themeProvider.themeMode,
       theme: ThemeData(
@@ -97,7 +88,6 @@ class MyApp extends StatelessWidget {
           primary: Colors.blue.shade700,
           surface: Colors.white,
           background: const Color(0xFFF0F4F8),
-          surfaceVariant: Colors.blue.shade50,
           surfaceContainerHighest: const Color(0xFFE3E3E3),
           onPrimaryContainer: Colors.black,
           brightness: Brightness.light,
@@ -117,27 +107,18 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-
-        // --- [AWAL PERUBAHAN ADA DI SINI] ---
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: const Color.fromARGB(255, 29, 40, 52),
           selectedItemColor: Colors.lightBlue.shade200,
           unselectedItemColor: Colors.grey.shade500,
-          selectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.normal,
-            fontSize: 12,
-          ),
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
         ),
-        // --- [AKHIR PERUBAHAN ADA DI SINI] ---
       ),
       home: const SplashScreen(),
-      debugShowCheckedModeBanner: false, //menghilangkan banner debug
+      debugShowCheckedModeBanner: false,
     );
   }
 }

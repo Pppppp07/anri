@@ -1,3 +1,6 @@
+// lib/pages/profile_page.dart
+
+import 'package:anri/pages/documentation_page.dart'; // <-- TAMBAHKAN IMPORT INI
 import 'package:anri/pages/login_page.dart';
 import 'package:anri/pages/settings_page.dart';
 import 'package:flutter/material.dart';
@@ -118,6 +121,21 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                   },
                 ),
+                // --- [MENU BARU DITAMBAHKAN DI SINI] ---
+                _buildProfileMenuItem(
+                  icon: Icons.menu_book_outlined,
+                  title: 'Dokumentasi',
+                  subtitle: 'Panduan penggunaan aplikasi',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const DocumentationPage(),
+                      ),
+                    );
+                  },
+                ),
+                // --- [AKHIR BLOK MENU BARU] ---
                 _buildProfileMenuItem(
                   icon: Icons.info_outline,
                   title: 'Tentang Aplikasi',
@@ -141,6 +159,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileHeader() {
+    // ... (kode _buildProfileHeader Anda tetap sama)
     final double statusBarHeight = MediaQuery.of(context).padding.top;
     final double appBarHeight = kToolbarHeight;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -208,6 +227,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required VoidCallback onTap,
     Color? color,
   }) {
+    // ... (kode _buildProfileMenuItem Anda tetap sama)
     final iconColor = color ?? Theme.of(context).colorScheme.secondary;
 
     return Card(
