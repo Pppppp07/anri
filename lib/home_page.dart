@@ -1,3 +1,5 @@
+// lib/home_page.dart
+
 import 'dart:async';
 import 'package:anri/services/firebase_api.dart';
 import 'package:anri/pages/error_page.dart';
@@ -96,11 +98,14 @@ class _HomePageState extends State<HomePage> {
       final offset = _scrollController.position.pixels;
 
       if (offset < 200) {
-        if (_fabState != FabState.hidden) setState(() => _fabState = FabState.hidden);
+        if (_fabState != FabState.hidden)
+          setState(() => _fabState = FabState.hidden);
       } else if (direction == ScrollDirection.reverse) {
-        if (_fabState != FabState.filter) setState(() => _fabState = FabState.filter);
+        if (_fabState != FabState.filter)
+          setState(() => _fabState = FabState.filter);
       } else if (direction == ScrollDirection.forward) {
-        if (_fabState != FabState.scrollToTop) setState(() => _fabState = FabState.scrollToTop);
+        if (_fabState != FabState.scrollToTop)
+          setState(() => _fabState = FabState.scrollToTop);
       }
     });
   }
@@ -117,7 +122,9 @@ class _HomePageState extends State<HomePage> {
 
   void _triggerSearch() {
     if (!mounted) return;
-    final assigneeParam = _currentView == TicketView.assignedToMe ? widget.currentUserName : '';
+    final assigneeParam = _currentView == TicketView.assignedToMe
+        ? widget.currentUserName
+        : '';
     final isHomePage = _selectedIndex == 0;
 
     context.read<TicketProvider>().fetchTickets(
@@ -132,7 +139,8 @@ class _HomePageState extends State<HomePage> {
 
   String _getStatusForAPI() {
     if (_selectedIndex == 1) return 'Resolved';
-    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe) return 'Active';
+    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe)
+      return 'Active';
     if (_selectedStatus == 'Semua Status') return 'All';
     return _selectedStatus;
   }
@@ -172,20 +180,25 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    _autoRefreshTimer = Timer.periodic(settingsProvider.refreshInterval, (timer) {
+    _autoRefreshTimer = Timer.periodic(settingsProvider.refreshInterval, (
+      timer,
+    ) {
       if (!mounted) {
         timer.cancel();
         return;
       }
 
       final ticketProvider = context.read<TicketProvider>();
-      final shouldRefresh = _selectedIndex != 2 &&
+      final shouldRefresh =
+          _selectedIndex != 2 &&
           _searchController.text.isEmpty &&
           ticketProvider.listState != ListState.loading &&
           !ticketProvider.isLoadingMore;
 
       if (shouldRefresh) {
-        final assigneeParam = _currentView == TicketView.assignedToMe ? widget.currentUserName : '';
+        final assigneeParam = _currentView == TicketView.assignedToMe
+            ? widget.currentUserName
+            : '';
         final isHomePage = _selectedIndex == 0;
         ticketProvider.fetchTickets(
           status: _getStatusForAPI(),
@@ -202,21 +215,31 @@ class _HomePageState extends State<HomePage> {
 
   String _getPriorityIconPath(String priority) {
     switch (priority) {
-      case 'Critical': return 'assets/images/label-critical.png';
-      case 'High': return 'assets/images/label-high.png';
-      case 'Medium': return 'assets/images/label-medium.png';
-      case 'Low': return 'assets/images/label-low.png';
-      default: return 'assets/images/label-medium.png';
+      case 'Critical':
+        return 'assets/images/label-critical.png';
+      case 'High':
+        return 'assets/images/label-high.png';
+      case 'Medium':
+        return 'assets/images/label-medium.png';
+      case 'Low':
+        return 'assets/images/label-low.png';
+      default:
+        return 'assets/images/label-medium.png';
     }
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority) {
-      case 'Critical': return Colors.red.shade400;
-      case 'High': return Colors.orange.shade400;
-      case 'Medium': return Colors.lightGreen.shade400;
-      case 'Low': return Colors.lightBlue.shade400;
-      default: return Colors.grey;
+      case 'Critical':
+        return Colors.red.shade400;
+      case 'High':
+        return Colors.orange.shade400;
+      case 'Medium':
+        return Colors.lightGreen.shade400;
+      case 'Low':
+        return Colors.lightBlue.shade400;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -252,13 +275,16 @@ class _HomePageState extends State<HomePage> {
                             isLabelVisible: notifProvider.unreadCount > 0,
                             label: Text(notifProvider.unreadCount.toString()),
                             child: IconButton(
-                              icon: const Icon(Icons.notifications_none_outlined),
+                              icon: const Icon(
+                                Icons.notifications_none_outlined,
+                              ),
                               tooltip: 'Notifikasi',
                               onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const NotificationPage(),
+                                    builder: (context) =>
+                                        const NotificationPage(),
                                   ),
                                 );
                               },
@@ -370,7 +396,11 @@ class _HomePageState extends State<HomePage> {
         return RefreshIndicator(
           onRefresh: () async {
             if (_fabState != FabState.hidden) {
-              await _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+              await _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
             }
             _triggerSearch();
           },
@@ -382,11 +412,18 @@ class _HomePageState extends State<HomePage> {
                 builder: (context, provider, child) {
                   switch (provider.listState) {
                     case ListState.loading:
-                      return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
+                      return const SliverFillRemaining(
+                        child: Center(child: CircularProgressIndicator()),
+                      );
                     case ListState.error:
-                      return SliverFillRemaining(child: _buildErrorState(provider.errorMessage));
+                      return SliverFillRemaining(
+                        child: _buildErrorState(provider.errorMessage),
+                      );
                     case ListState.empty:
-                      return SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState());
+                      return SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmptyState(),
+                      );
                     case ListState.hasData:
                       return SliverList(
                         delegate: SliverChildBuilderDelegate(
@@ -396,7 +433,8 @@ class _HomePageState extends State<HomePage> {
                               return TicketCard(
                                 key: ValueKey(ticket.id),
                                 ticket: ticket,
-                                allCategories: appDataProvider.categoryListForDropdown,
+                                allCategories:
+                                    appDataProvider.categoryListForDropdown,
                                 allTeamMembers: appDataProvider.teamMembers,
                                 currentUserName: widget.currentUserName,
                                 onRefresh: _triggerSearch,
@@ -405,7 +443,9 @@ class _HomePageState extends State<HomePage> {
                               return _buildPaginationControl(provider);
                             }
                           },
-                          childCount: provider.tickets.length + (provider.hasMore ? 1 : 0),
+                          childCount:
+                              provider.tickets.length +
+                              (provider.hasMore ? 1 : 0),
                         ),
                       );
                   }
@@ -568,17 +608,24 @@ class _HomePageState extends State<HomePage> {
                         content: Text(
                           message,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
                         duration: const Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                       ),
                     );
                 },
@@ -655,7 +702,9 @@ class _HomePageState extends State<HomePage> {
                       side: BorderSide(
                         color: _selectedStatus == status
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                            : Theme.of(
+                                context,
+                              ).colorScheme.outline.withOpacity(0.5),
                         width: 1.0,
                       ),
                     ),
@@ -695,13 +744,20 @@ class _HomePageState extends State<HomePage> {
 
     Color getStatusColor(String status) {
       switch (status) {
-        case 'New': return const Color(0xFFD32F2F);
-        case 'Waiting Reply': return const Color(0xFFE65100);
-        case 'Replied': return const Color(0xFF1976D2);
-        case 'In Progress': return const Color(0xFF673AB7);
-        case 'On Hold': return const Color(0xFFC2185B);
-        case 'Resolved': return const Color(0xFF388E3C);
-        default: return Colors.grey.shade700;
+        case 'New':
+          return const Color(0xFFD32F2F);
+        case 'Waiting Reply':
+          return const Color(0xFFE65100);
+        case 'Replied':
+          return const Color(0xFF1976D2);
+        case 'In Progress':
+          return const Color(0xFF673AB7);
+        case 'On Hold':
+          return const Color(0xFFC2185B);
+        case 'Resolved':
+          return const Color(0xFF388E3C);
+        default:
+          return Colors.grey.shade700;
       }
     }
 
@@ -934,51 +990,68 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildErrorState(String rawError) {
     final errorInfo = ErrorIdentifier.from(rawError);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.wifi_off_outlined, size: 80, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            const Text(
-              'Gagal Memuat Data',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              errorInfo.userMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _triggerSearch,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
-            ),
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ErrorPage(
-                    message: errorInfo.userMessage,
-                    referenceCode: errorInfo.referenceCode,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.wifi_off_outlined,
+                      size: 64,
+                      color: Colors.red.shade300,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Gagal Memuat Data',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      errorInfo.userMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 15, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _triggerSearch,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Coba Lagi'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ErrorPage(
+                            message: errorInfo.userMessage,
+                            referenceCode: errorInfo.referenceCode,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('Lihat Detail Error'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              icon: const Icon(Icons.info_outline),
-              label: const Text('Lihat Detail Error'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey.shade700,
-              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

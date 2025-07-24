@@ -1,7 +1,5 @@
 // lib/main.dart
 
-import 'dart:convert';
-import 'package:anri/models/notification_model.dart';
 import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/app_data_provider.dart';
 import 'package:anri/providers/notification_provider.dart';
@@ -15,44 +13,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'firebase_options.dart'; // Pastikan import ini ada
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
+// --- [PERUBAHAN 1: DEFINISIKAN BACKGROUND HANDLER] ---
+// Handler ini harus berada di luar kelas (top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  // Inisialisasi Firebase agar plugin bisa digunakan di background isolate.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint("Notifikasi Background Diterima: ${message.messageId}");
-  try {
-    final newNotification = NotificationModel.fromRemoteMessage(message);
-    final prefs = await SharedPreferences.getInstance();
-    const historyKey = 'notification_history';
-    final List<String> notificationsJson = prefs.getStringList(historyKey) ?? [];
-    notificationsJson.insert(0, json.encode(newNotification.toJson()));
-    if (notificationsJson.length > 50) {
-      notificationsJson.removeLast();
-    }
-    await prefs.setStringList(historyKey, notificationsJson);
-    const unreadCountKey = 'notification_unread_count';
-    int unreadCount = prefs.getInt(unreadCountKey) ?? 0;
-    unreadCount++;
-    await prefs.setInt(unreadCountKey, unreadCount);
-    debugPrint("Notifikasi background BERHASIL DISIMPAN ke SharedPreferences.");
-  } catch (e) {
-    debugPrint("Gagal menyimpan notifikasi background: $e");
-  }
+
+  // Panggil metode terpusat untuk menampilkan notifikasi lokal.
+  // Metode ini akan kita buat di firebase_api.dart
+  // Instance baru dibuat karena ini berjalan di isolate yang berbeda.
+  await FirebaseApi().showLocalNotification(message);
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  // Gunakan firebase_options.dart untuk inisialisasi
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // --- [PERUBAHAN 2: DAFTARKAN BACKGROUND HANDLER] ---
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   await initializeDateFormatting('id_ID', null);
   await dotenv.load(fileName: ".env");
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     debugPrint(details.toString());
-    return Material(/* ... Error Widget Anda ... */);
+    // Widget error fallback Anda
+    return Material(
+      child: Center(
+        child: Text(
+          'Terjadi error pada aplikasi.',
+          style: TextStyle(color: Colors.red),
+        ),
+      ),
+    );
   };
   
   runApp(
