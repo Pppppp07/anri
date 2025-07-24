@@ -50,6 +50,7 @@
 /android/.idea/
 /android/Flutter/
 /android/*_plugin.iml
+/android/app/google-services.json
 
 # VS Code
 .vscode/
