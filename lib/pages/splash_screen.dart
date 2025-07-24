@@ -1,6 +1,11 @@
+// lib/pages/splash_screen.dart
+
 import 'package:anri/home_page.dart';
 import 'package:anri/pages/login_page.dart';
+import 'package:anri/providers/app_data_provider.dart';
 import 'package:anri/providers/settings_provider.dart';
+import 'package:anri/services/firebase_api.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
@@ -16,8 +21,7 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -28,81 +32,81 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 10),
     )..repeat();
 
-    // Memanggil fungsi utama setelah frame pertama selesai di-render
+    // Memanggil alur utama setelah frame pertama selesai di-render.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkLoginStatus();
+      _initializeApp();
     });
   }
 
-  // Fungsi utama yang menangani alur pembukaan aplikasi
-  Future<void> _checkLoginStatus() async {
-    // Beri jeda agar splash screen terlihat
+  // --- [PERBAIKAN UTAMA] Alur inisialisasi aplikasi terpusat ---
+  Future<void> _initializeApp() async {
+    // Beri jeda agar splash screen terlihat.
     await Future.delayed(const Duration(milliseconds: 2500));
     
-    // Pastikan widget masih ada sebelum menggunakan context
     if (!mounted) return;
 
+    // 1. Muat semua data esensial dari provider.
+    // `context.read` aman digunakan di sini karena ini adalah event satu kali.
     final settingsProvider = context.read<SettingsProvider>();
-    
-    // --- PERBAIKAN UTAMA ADA DI SINI ---
-    // Baris ini 'memaksa' aplikasi untuk menunggu sampai semua pengaturan
-    // (termasuk status kunci aplikasi) selesai dimuat dari memori.
-    await settingsProvider.loadSettings();
-    // ------------------------------------
+    final appDataProvider = context.read<AppDataProvider>();
 
-    // Setelah 'await' di atas, nilai ini dijamin yang paling update.
-    final bool appLockEnabled = settingsProvider.isAppLockEnabled;
+    // Menunggu semua data siap: pengaturan dan data anggota tim.
+    await Future.wait([
+      settingsProvider.loadSettings(),
+      appDataProvider.fetchTeamMembers(),
+    ]);
 
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    // 2. Cek status login.
+    final prefs = await SharedPreferences.getInstance();
     final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
+    // 3. Cek apakah aplikasi dibuka dari notifikasi saat terminated.
+    final RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+
     if (!mounted) return;
 
-    // Jika pengguna sudah login sebelumnya
+    // 4. Tentukan alur navigasi berdasarkan status login dan notifikasi.
     if (isLoggedIn) {
-      // DAN kunci aplikasi aktif, maka minta otentikasi
+      final bool appLockEnabled = settingsProvider.isAppLockEnabled;
+      bool authenticated = true; // Anggap berhasil jika kunci aplikasi mati.
+
       if (appLockEnabled) {
-        bool authenticated = await _authenticateWithExit();
-        // Jika otentikasi berhasil, baru masuk ke halaman utama
-        if (authenticated) {
+        authenticated = await _authenticateWithExit();
+      }
+
+      if (authenticated) {
+        // Jika notifikasi awal ada, langsung navigasi ke detail tiket.
+        if (initialMessage != null) {
+          _navigateToHomeAndHandleNotification(prefs, initialMessage);
+        } else {
           _navigateToHome(prefs);
         }
-      } else {
-        // Jika tidak ada kunci aplikasi, langsung masuk ke halaman utama
-        _navigateToHome(prefs);
       }
     } else {
-      // Jika belum login, selalu ke halaman login
+      // Jika belum login, selalu ke halaman login.
       _navigateToLogin();
     }
   }
 
-  // Fungsi untuk otentikasi, akan menutup aplikasi jika gagal atau dibatalkan
   Future<bool> _authenticateWithExit() async {
     final LocalAuthentication auth = LocalAuthentication();
     try {
       final bool canAuthenticate = await auth.canCheckBiometrics || await auth.isDeviceSupported();
-      if (!canAuthenticate) {
-        // Jika perangkat tidak mendukung, anggap saja berhasil agar tidak terkunci selamanya
-        return true;
-      }
+      if (!canAuthenticate) return true;
 
       return await auth.authenticate(
         localizedReason: 'Silakan otentikasi untuk membuka aplikasi ANRI Helpdesk',
-        options: const AuthenticationOptions(
-          stickyAuth: true, // Dialog tidak hilang jika aplikasi ke background
-          biometricOnly: false, // Izinkan PIN/Pola jika biometrik gagal
-        ),
+        options: const AuthenticationOptions(stickyAuth: true, biometricOnly: false),
       );
     } on PlatformException catch (e) {
       debugPrint("Error otentikasi: $e");
-      // Jika pengguna membatalkan atau terjadi error, tutup aplikasi
       SystemNavigator.pop();
       return false;
     }
   }
 
-  // Helper untuk navigasi ke halaman utama
   void _navigateToHome(SharedPreferences prefs) {
     final String? userName = prefs.getString('user_name');
     final String? authToken = prefs.getString('auth_token');
@@ -111,10 +115,7 @@ class _SplashScreenState extends State<SplashScreen>
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => HomePage(
-            currentUserName: userName,
-            authToken: authToken,
-          ),
+          builder: (context) => HomePage(currentUserName: userName, authToken: authToken),
         ),
       );
     } else {
@@ -122,7 +123,37 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  // Helper untuk navigasi ke halaman login
+  // --- [FUNGSI BARU] Navigasi ke HomePage lalu langsung proses notifikasi ---
+  void _navigateToHomeAndHandleNotification(SharedPreferences prefs, RemoteMessage message) {
+    final String? userName = prefs.getString('user_name');
+    final String? authToken = prefs.getString('auth_token');
+
+    if (userName != null && authToken != null && mounted) {
+      // Ganti halaman saat ini dengan HomePage.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomePage(currentUserName: userName, authToken: authToken),
+        ),
+      );
+      
+      // Setelah HomePage siap, panggil logika navigasi notifikasi.
+      // Memberi sedikit jeda memastikan HomePage sudah terbangun sepenuhnya.
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+           final ticketId = message.data['ticket_id'];
+           if (ticketId != null) {
+              // Gunakan context dari provider, bukan dari splash screen yang akan hilang.
+              context.read<FirebaseApi>().navigateToTicketDetail(ticketId);
+           }
+        }
+      });
+
+    } else {
+      _navigateToLogin();
+    }
+  }
+
   void _navigateToLogin() {
     if (mounted) {
       Navigator.pushReplacement(
