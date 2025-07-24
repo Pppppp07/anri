@@ -36,6 +36,9 @@
 /ios/Flutter/Generated.xcconfig
 
 # Android
+/android/app/debug
+/android/app/profile
+/android/app/release
 /android/gradle.properties
 /android/local.properties
 /android/key.properties
@@ -63,3 +66,5 @@
 .env
 firebase.json
 pubspec.lock
+/htdocs/anri_helpdesk_api/service-account-key.json
+/anri_helpdesk_api/service-account-key.json
