@@ -6,46 +6,33 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final String _historyKey = 'notification_history';
-  final String _unreadCountKey = 'notification_unread_count';
+  // Kunci _unreadCountKey tidak lagi diperlukan
 
   final List<NotificationModel> _notifications = [];
-  int _unreadCount = 0;
 
   List<NotificationModel> get notifications => _notifications;
-  int get unreadCount => _unreadCount;
+  
+  // --- PERBAIKAN: Ubah unreadCount menjadi getter dinamis ---
+  int get unreadCount => _notifications.where((n) => !n.isRead).length;
 
   NotificationProvider() {
     debugPrint('[Provider] NotificationProvider Dibuat.');
     loadNotifications();
   }
 
-  // --- PERBAIKAN UTAMA ADA DI FUNGSI INI ---
   Future<void> loadNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    // PERINTAH KRUSIAL: Paksa untuk membaca ulang data terbaru dari disk
     await prefs.reload(); 
-    
     final List<String> notificationsJson = prefs.getStringList(_historyKey) ?? [];
     _notifications.clear();
     _notifications.addAll(notificationsJson
         .map((jsonString) => NotificationModel.fromJson(json.decode(jsonString)))
         .toList());
         
-    // Pindahkan pemuatan unread count ke sini agar data selalu sinkron
-    _unreadCount = prefs.getInt(_unreadCountKey) ?? 0;
-    debugPrint('[Provider] Notifikasi dimuat ulang: Ditemukan ${_notifications.length} notifikasi, ${_unreadCount} belum dibaca.');
-    
+    debugPrint('[Provider] Notifikasi dimuat ulang: Ditemukan ${_notifications.length} notifikasi, ${unreadCount} belum dibaca.');
     notifyListeners();
   }
   
-  // Method _loadUnreadCount tidak lagi diperlukan secara terpisah karena sudah digabung
-  // ke dalam loadNotifications() untuk memastikan konsistensi data.
-  
-  Future<void> _saveUnreadCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_unreadCountKey, _unreadCount);
-  }
-
   Future<void> addNotification(RemoteMessage message) async {
     final newNotification = NotificationModel.fromRemoteMessage(message);
 
@@ -61,25 +48,23 @@ class NotificationProvider extends ChangeNotifier {
       _notifications.removeLast();
     }
     
-    _unreadCount++;
-    await _saveUnreadCount();
-    
     await _saveNotifications();
     notifyListeners();
   }
   
-  Future<void> markAsRead() async {
-    if (_unreadCount == 0) return;
-    _unreadCount = 0;
-    await _saveUnreadCount();
-    notifyListeners();
+  // --- FUNGSI BARU: Untuk menandai satu notifikasi sebagai telah dibaca ---
+  Future<void> markOneAsRead(NotificationModel notification) async {
+    final index = _notifications.indexWhere((n) => n.messageId == notification.messageId);
+    if (index != -1 && !_notifications[index].isRead) {
+      _notifications[index].isRead = true;
+      await _saveNotifications();
+      notifyListeners();
+    }
   }
   
   Future<void> clearNotifications() async {
     _notifications.clear();
-    _unreadCount = 0;
     await _saveNotifications();
-    await _saveUnreadCount();
     debugPrint('[Provider] Notifikasi dibersihkan.');
     notifyListeners();
   }
