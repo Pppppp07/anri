@@ -43,7 +43,9 @@ class FirebaseApi {
 
     // --- [PERBAIKAN UTAMA DI SINI] ---
     // ID unik dibuat dari `millisecondsSinceEpoch` namun dibatasi agar sesuai dengan integer 32-bit.
-    final int notificationId = DateTime.now().millisecondsSinceEpoch.toSigned(31);
+    final int notificationId = DateTime.now().millisecondsSinceEpoch.toSigned(
+      31,
+    );
 
     _localNotifications.show(
       notificationId,
@@ -56,7 +58,7 @@ class FirebaseApi {
           channelDescription: _androidChannel.description,
           icon: '@drawable/ic_notification',
           importance: Importance.high,
-          priority: Priority.high
+          priority: Priority.high,
         ),
       ),
       payload: ticketId,
@@ -73,7 +75,10 @@ class FirebaseApi {
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
     try {
-      final appDataProvider = Provider.of<AppDataProvider>(context, listen: false);
+      final appDataProvider = Provider.of<AppDataProvider>(
+        context,
+        listen: false,
+      );
       final results = await Future.wait([
         appDataProvider.fetchTeamMembers(),
         _getAuthHeaders(),
@@ -90,7 +95,9 @@ class FirebaseApi {
       }
       final prefs = results[2] as SharedPreferences;
       final currentUserName = prefs.getString('user_name') ?? 'Unknown';
-      final url = Uri.parse('${ApiConfig.baseUrl}/get_ticket_details.php?id=$ticketId');
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/get_ticket_details.php?id=$ticketId',
+      );
       final response = await http.get(url, headers: headers);
       Navigator.pop(context);
       if (!context.mounted) return;
@@ -100,7 +107,10 @@ class FirebaseApi {
           final List<Attachment> attachments = (data['attachments'] as List)
               .map((attJson) => Attachment.fromJson(attJson))
               .toList();
-          final ticket = Ticket.fromJson(data['ticket_details'], attachments: attachments);
+          final ticket = Ticket.fromJson(
+            data['ticket_details'],
+            attachments: attachments,
+          );
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -113,13 +123,17 @@ class FirebaseApi {
             ),
           );
         } else {
-           throw Exception(data['message'] ?? 'Gagal memuat detail tiket dari notifikasi.');
+          throw Exception(
+            data['message'] ?? 'Gagal memuat detail tiket dari notifikasi.',
+          );
         }
       } else {
-        throw Exception('Gagal terhubung ke server (Status: ${response.statusCode})');
+        throw Exception(
+          'Gagal terhubung ke server (Status: ${response.statusCode})',
+        );
       }
     } catch (e) {
-      if(context.mounted) Navigator.pop(context);
+      if (context.mounted) Navigator.pop(context);
       debugPrint('Gagal membuka detail tiket dari notifikasi: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -131,18 +145,21 @@ class FirebaseApi {
 
   void handleMessage(RemoteMessage? message) {
     if (message == null) return;
-    
+
     final context = navigatorKey.currentContext;
     if (context != null && context.mounted) {
-      Provider.of<NotificationProvider>(context, listen: false).addNotification(message);
+      Provider.of<NotificationProvider>(
+        context,
+        listen: false,
+      ).addNotification(message);
     }
-    
+
     final ticketId = message.data['ticket_id'];
     if (ticketId != null) {
       navigateToTicketDetail(ticketId);
     }
   }
-  
+
   Future<void> initNotifications() async {
     await _firebaseMessaging.requestPermission();
     final fcmToken = await _firebaseMessaging.getToken();
@@ -152,22 +169,25 @@ class FirebaseApi {
     _firebaseMessaging.onTokenRefresh.listen(_sendTokenToServer);
     initPushNotifications();
   }
-  
+
   Future<void> _sendTokenToServer(String token) async {
-     final headers = await _getAuthHeaders();
+    final headers = await _getAuthHeaders();
     if (headers.isEmpty) return;
     final url = Uri.parse('${ApiConfig.baseUrl}/update_fcm_token.php');
     try {
       await http.post(
         url,
-        headers: {...headers, 'Content-Type': 'application/json; charset=UTF-8'},
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
         body: json.encode({'token': token}),
       );
     } catch (e) {
       debugPrint('Gagal mengirim token FCM: $e');
     }
   }
-  
+
   Future<void> initLocalNotifications() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');
     const settings = InitializationSettings(android: android);
@@ -182,17 +202,33 @@ class FirebaseApi {
       },
     );
 
-    final platform = _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final platform = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await platform?.createNotificationChannel(_androidChannel);
   }
 
   Future<void> initPushNotifications() async {
     await initLocalNotifications();
-    
+
     // Foreground handler
     FirebaseMessaging.onMessage.listen((message) {
-        debugPrint('[FIREBASE API] Foreground notification received.');
-        showLocalNotification(message);
+      debugPrint('[FIREBASE API] Foreground notification received.');
+
+      // --- AWAL PERBAIKAN ---
+      // Tambahkan notifikasi ke provider agar masuk ke riwayat di halaman notifikasi
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        Provider.of<NotificationProvider>(
+          context,
+          listen: false,
+        ).addNotification(message);
+      }
+      // --- AKHIR PERBAIKAN ---
+
+      // Tampilkan notifikasi lokal seperti biasa
+      showLocalNotification(message);
     });
 
     // Handler saat notifikasi di-tap (dari background)

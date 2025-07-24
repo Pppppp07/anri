@@ -1,5 +1,6 @@
 // lib/main.dart
 
+import 'package:anri/models/notification_model.dart'; // <-- PERBAIKAN DI SINI
 import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/app_data_provider.dart';
 import 'package:anri/providers/notification_provider.dart';
@@ -13,18 +14,55 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart'; // Pastikan import ini ada
+import 'firebase_options.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
-// --- [PERUBAHAN 1: DEFINISIKAN BACKGROUND HANDLER] ---
 // Handler ini harus berada di luar kelas (top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Inisialisasi Firebase agar plugin bisa digunakan di background isolate.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint("Notifikasi Background Diterima: ${message.messageId}");
+  // Logika untuk menyimpan notifikasi secara manual ke SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
 
+  // 1. Ambil riwayat notifikasi yang sudah ada
+  final List<String> notificationsJson =
+      prefs.getStringList('notification_history') ?? [];
+  final List<NotificationModel> notifications = notificationsJson
+      .map((jsonString) => NotificationModel.fromJson(json.decode(jsonString)))
+      .toList();
+
+  // 2. Buat notifikasi baru dari pesan yang masuk
+  final newNotification = NotificationModel.fromRemoteMessage(message);
+
+  // 3. Cek duplikat dan tambahkan jika belum ada, lalu simpan kembali
+  if (newNotification.messageId == null ||
+      !notifications.any((n) => n.messageId == newNotification.messageId)) {
+    notifications.insert(0, newNotification);
+    if (notifications.length > 50) {
+      notifications.removeLast();
+    }
+    final List<String> updatedNotificationsJson = notifications
+        .map((notif) => json.encode(notif.toJson()))
+        .toList();
+    await prefs.setStringList('notification_history', updatedNotificationsJson);
+
+    // 4. Perbarui hitungan notifikasi belum dibaca
+    final int unreadCount =
+        (prefs.getInt('notification_unread_count') ?? 0) + 1;
+    await prefs.setInt('notification_unread_count', unreadCount);
+    debugPrint(
+      '[Background Handler] Notifikasi disimpan, total belum dibaca: $unreadCount',
+    );
+  } else {
+    debugPrint(
+      '[Background Handler] Notifikasi duplikat terdeteksi, tidak disimpan.',
+    );
+  }
   // Panggil metode terpusat untuk menampilkan notifikasi lokal.
   // Metode ini akan kita buat di firebase_api.dart
   // Instance baru dibuat karena ini berjalan di isolate yang berbeda.
@@ -54,7 +92,7 @@ Future<void> main() async {
       ),
     );
   };
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -111,8 +149,14 @@ class MyApp extends StatelessWidget {
           backgroundColor: const Color.fromARGB(255, 29, 40, 52),
           selectedItemColor: Colors.lightBlue.shade200,
           unselectedItemColor: Colors.grey.shade500,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.normal,
+            fontSize: 12,
+          ),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
         ),

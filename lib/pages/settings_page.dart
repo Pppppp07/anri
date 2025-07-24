@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:anri/pages/login_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -252,18 +253,38 @@ class _SettingsPageState extends State<SettingsPage> {
           FilledButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
+              await prefs.clear(); // Menghapus semua data SharedPreferences
+              
               if (!mounted) return;
+
+              // Reset semua state provider ke nilai default
               context.read<ThemeProvider>().setThemeMode(ThemeMode.system);
               context.read<SettingsProvider>().setRefreshInterval(15);
               context.read<SettingsProvider>().setAppLock(false);
-              Navigator.of(context).pop();
+
+              // Tampilkan pesan sukses
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text(
-                    'Cache berhasil dihapus! Pengaturan direset ke default.',
+                    'Cache berhasil dihapus! Anda telah logout.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
                   ),
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  duration: const Duration(seconds: 3), // Sesuaikan durasi jika perlu
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 ),
+              );
+
+              // Navigasi ke halaman Login dan hapus semua halaman sebelumnya
+              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (Route<dynamic> route) => false,
               );
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),

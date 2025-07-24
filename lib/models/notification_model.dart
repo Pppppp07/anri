@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 class NotificationModel {
-  // --- [PERUBAHAN 1] Tambahkan messageId ---
   final String? messageId;
   final String title;
   final String body;
@@ -10,7 +9,7 @@ class NotificationModel {
   final DateTime receivedAt;
 
   NotificationModel({
-    this.messageId, // Tambahkan di constructor
+    this.messageId,
     required this.title,
     required this.body,
     required this.ticketId,
@@ -19,10 +18,11 @@ class NotificationModel {
 
   factory NotificationModel.fromRemoteMessage(RemoteMessage message) {
     return NotificationModel(
-      // --- [PERUBAHAN 2] Ambil messageId dari RemoteMessage ---
       messageId: message.messageId,
-      title: message.notification?.title ?? 'Tanpa Judul',
-      body: message.notification?.body ?? 'Tanpa Isi',
+      // --- PERBAIKAN DI SINI ---
+      // Ambil judul dan isi dari message.data, bukan message.notification
+      title: message.data['title'] ?? 'Tanpa Judul',
+      body: message.data['body'] ?? 'Tanpa Isi',
       ticketId: message.data['ticket_id'] ?? '0',
       receivedAt: DateTime.now(),
     );
@@ -30,7 +30,6 @@ class NotificationModel {
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
     return NotificationModel(
-      // --- [PERUBAHAN 3] Baca messageId dari JSON ---
       messageId: json['messageId'],
       title: json['title'],
       body: json['body'],
@@ -41,7 +40,6 @@ class NotificationModel {
 
   Map<String, dynamic> toJson() {
     return {
-      // --- [PERUBAHAN 4] Simpan messageId ke JSON ---
       'messageId': messageId,
       'title': title,
       'body': body,

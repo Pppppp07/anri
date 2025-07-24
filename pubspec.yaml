@@ -10,16 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # --- BARU: Tambahkan Firebase Core dan Messaging ---
-  firebase_core: ^3.1.1
-  firebase_messaging: ^15.0.2
-  # --- AKHIR BLOK BARU ---
-
   local_auth: ^2.2.0
   shared_preferences: ^2.2.3
-  particles_flutter: ^1.0.1
+  particles_flutter: ^0.1.4
   cupertino_icons: ^1.0.8
-  intl: ^0.20.2
+  intl: ^0.19.0
   http: ^1.2.1
   timeago: ^3.6.1
   flutter_html: ^3.0.0
@@ -27,16 +22,18 @@ dependencies:
   photo_view: ^0.15.0
   flutter_pdfview: ^1.3.2
   path_provider: ^2.1.3
-  file_picker: ^10.2.0
+  file_picker: ^8.0.6
   provider: ^6.1.2
   url_launcher: ^6.3.1
   flutter_local_notifications: ^19.3.1
-
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: "^0.13.1"
 
 flutter:
   uses-material-design: true
@@ -47,3 +44,9 @@ flutter:
     - assets/images/label-medium.png
     - assets/images/label-low.png
     - .env
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true             
+  image_path: "assets/icon/logo.png"
+  min_sdk_android: 21
