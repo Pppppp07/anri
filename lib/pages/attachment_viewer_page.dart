@@ -24,7 +24,8 @@ class _AttachmentViewerPageState extends State<AttachmentViewerPage> {
   bool get isImage => ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
       .any((ext) => widget.attachment.realName.toLowerCase().endsWith(ext));
   bool get isPdf => widget.attachment.realName.toLowerCase().endsWith('.pdf');
-
+  bool get isDoc => widget.attachment.realName.toLowerCase().endsWith('.doc');
+  bool get isDocx => widget.attachment.realName.toLowerCase().endsWith('.docx');
   @override
   void initState() {
     super.initState();

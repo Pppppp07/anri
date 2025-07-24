@@ -1,3 +1,5 @@
+// lib/providers/settings_provider.dart
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,10 +16,11 @@ class SettingsProvider with ChangeNotifier {
   bool get isAppLockEnabled => _isAppLockEnabled;
 
   SettingsProvider() {
-    loadSettings(); // Panggil method publik
+    // --- [PERBAIKAN] Hapus pemanggilan loadSettings() dari sini. ---
+    // Pemanggilan ini sudah ditangani dengan aman di SplashScreen.
+    // loadSettings(); 
   }
 
-  // DIUBAH: Method ini sekarang publik (tanpa underscore)
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     
@@ -29,10 +32,9 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  // Helper untuk mengatur state durasi dan teksnya
   void _setDurationAndText(int seconds) {
     if (seconds == 0) {
-      _refreshInterval = Duration.zero; // Jika 0, timer mati
+      _refreshInterval = Duration.zero;
       _refreshIntervalText = 'Mati';
     } else {
       _refreshInterval = Duration(seconds: seconds);
@@ -44,7 +46,6 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
-  // Fungsi utama yang akan dipanggil dari UI untuk mengubah interval
   Future<void> setRefreshInterval(int seconds) async {
     _setDurationAndText(seconds);
     notifyListeners();
@@ -53,7 +54,6 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setInt(REFRESH_INTERVAL_KEY, seconds);
   }
 
-  // Fungsi untuk mengubah dan menyimpan status kunci aplikasi
   Future<void> setAppLock(bool isEnabled) async {
     _isAppLockEnabled = isEnabled;
     notifyListeners();
