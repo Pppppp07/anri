@@ -35,7 +35,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -76,6 +76,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FirebaseApi>().initNotifications();
@@ -112,12 +113,25 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _autoRefreshTimer?.cancel();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Jika aplikasi kembali dari background atau dibuka (setelah splash screen)
+    if (state == AppLifecycleState.resumed) {
+      if (mounted) {
+        // Panggil provider untuk memuat ulang data terbaru dari penyimpanan
+        context.read<NotificationProvider>().loadNotifications();
+      }
+    }
   }
 
   void _triggerSearch() {

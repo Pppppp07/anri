@@ -17,25 +17,29 @@ class NotificationProvider extends ChangeNotifier {
   NotificationProvider() {
     debugPrint('[Provider] NotificationProvider Dibuat.');
     loadNotifications();
-    _loadUnreadCount();
   }
 
+  // --- PERBAIKAN UTAMA ADA DI FUNGSI INI ---
   Future<void> loadNotifications() async {
     final prefs = await SharedPreferences.getInstance();
+    // PERINTAH KRUSIAL: Paksa untuk membaca ulang data terbaru dari disk
+    await prefs.reload(); 
+    
     final List<String> notificationsJson = prefs.getStringList(_historyKey) ?? [];
     _notifications.clear();
     _notifications.addAll(notificationsJson
         .map((jsonString) => NotificationModel.fromJson(json.decode(jsonString)))
         .toList());
-        debugPrint('[Provider] LoadNotifications: Ditemukan ${_notifications.length} notifikasi tersimpan.');
+        
+    // Pindahkan pemuatan unread count ke sini agar data selalu sinkron
+    _unreadCount = prefs.getInt(_unreadCountKey) ?? 0;
+    debugPrint('[Provider] Notifikasi dimuat ulang: Ditemukan ${_notifications.length} notifikasi, ${_unreadCount} belum dibaca.');
+    
     notifyListeners();
   }
   
-  Future<void> _loadUnreadCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    _unreadCount = prefs.getInt(_unreadCountKey) ?? 0;
-    notifyListeners();
-  }
+  // Method _loadUnreadCount tidak lagi diperlukan secara terpisah karena sudah digabung
+  // ke dalam loadNotifications() untuk memastikan konsistensi data.
   
   Future<void> _saveUnreadCount() async {
     final prefs = await SharedPreferences.getInstance();
@@ -45,14 +49,10 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> addNotification(RemoteMessage message) async {
     final newNotification = NotificationModel.fromRemoteMessage(message);
 
-    // --- [PERBAIKAN UTAMA DI SINI] ---
-    // Cek apakah notifikasi dengan messageId yang sama sudah ada.
-    // Ini akan secara efektif mencegah duplikasi dari race condition.
     if (newNotification.messageId != null && _notifications.any((n) => n.messageId == newNotification.messageId)) {
       debugPrint('[Provider] AddNotification DITOLAK: Duplikat messageId: ${newNotification.messageId}');
-      return; // Hentikan fungsi jika duplikat ditemukan.
+      return;
     }
-    // --- [AKHIR BLOK PERBAIKAN] ---
     
     debugPrint('[Provider] AddNotification DITERIMA: Menambahkan messageId: ${newNotification.messageId}');
     _notifications.insert(0, newNotification);

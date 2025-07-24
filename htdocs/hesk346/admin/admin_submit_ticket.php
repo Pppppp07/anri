@@ -513,7 +513,7 @@ if ($notify && $email_available) {
 // >>> NOTIFIKASI PUSH MENJADI SATU BARIS <<<
 $event = $ticket['owner'] ? 'new_assigned' : 'new_unassigned';
 $actor_id = isset($_SESSION['id']) ? $_SESSION['id'] : 0; // 0 jika pelanggan
-anri_kirim_semua_notifikasi($event, $ticket, $actor_id);
+anri_kirim_semua_notifikasi($hesk_settings, $event, $ticket, $actor_id);
 // --- AKHIR BLOK NOTIFIKASI DEBUG ---
 
 // Unset temporary variables
