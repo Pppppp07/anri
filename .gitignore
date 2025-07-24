@@ -60,5 +60,5 @@
 
 # Secret files - Tambahkan file sensitif Anda di sini
 .env
-.firebase.json
-.pubspec.lock
+firebase.json
+pubspec.lock
