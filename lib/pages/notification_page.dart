@@ -1,12 +1,10 @@
 import 'package:anri/models/notification_model.dart';
 import 'package:anri/providers/notification_provider.dart';
 import 'package:anri/services/firebase_api.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-// --- UBAH MENJADI STATEFULWIDGET ---
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
 
@@ -16,18 +14,7 @@ class NotificationPage extends StatefulWidget {
 
 class _NotificationPageState extends State<NotificationPage> {
   @override
-  void initState() {
-    super.initState();
-    // Panggil setelah frame pertama selesai dibangun
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Saat halaman ini dibuka, reset hitungan notifikasi belum dibaca
-      context.read<NotificationProvider>().markAsRead();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Gunakan Consumer untuk mendapatkan data dari NotificationProvider
     return Consumer<NotificationProvider>(
       builder: (context, provider, child) {
         return Scaffold(
@@ -35,18 +22,18 @@ class _NotificationPageState extends State<NotificationPage> {
             title: const Text('Notifikasi'),
             elevation: 1,
             actions: [
-              // Tambahkan tombol untuk menghapus semua notifikasi
               if (provider.notifications.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.delete_sweep_outlined),
                   tooltip: 'Hapus Semua',
                   onPressed: () {
-                    // Tampilkan dialog konfirmasi sebelum menghapus
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
                         title: const Text('Hapus Riwayat'),
-                        content: const Text('Apakah Anda yakin ingin menghapus semua riwayat notifikasi?'),
+                        content: const Text(
+                          'Apakah Anda yakin ingin menghapus semua riwayat notifikasi?',
+                        ),
                         actions: [
                           TextButton(
                             child: const Text('Batal'),
@@ -67,36 +54,70 @@ class _NotificationPageState extends State<NotificationPage> {
             ],
           ),
           body: provider.notifications.isEmpty
-              ? _buildEmptyState() // Tampilkan state kosong jika tidak ada notifikasi
-              : _buildNotificationList(provider.notifications), // Tampilkan list jika ada
+              ? _buildEmptyState()
+              : _buildNotificationList(provider),
         );
       },
     );
   }
 
-  // Widget untuk menampilkan daftar notifikasi
-  Widget _buildNotificationList(List<NotificationModel> notifications) {
+  Widget _buildNotificationList(NotificationProvider provider) {
     final timeFormat = DateFormat('HH:mm');
+    final notifications = provider.notifications;
 
-    return ListView.builder(
+    return ListView.separated(
       itemCount: notifications.length,
+      separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        final notif = notifications[index];
-        return ListTile(
-          leading: const Icon(Icons.notifications_active_outlined, color: Colors.blueAccent),
-          title: Text(notif.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(notif.body),
-          trailing: Text(timeFormat.format(notif.receivedAt), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          onTap: () {
-            // Saat di-tap, panggil handleMessage untuk membuka detail tiket
-    FirebaseApi().navigateToTicketDetail(notif.ticketId);
-          },
+        final notif = notifications.elementAt(index);
+        return Stack(
+          // 1. Bungkus ListTile dengan Stack
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.notifications_active_outlined,
+                color: Colors.blueAccent,
+              ),
+              title: Text(
+                notif.title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(notif.body),
+              trailing: Text(
+                timeFormat.format(
+                  notif.receivedAt,
+                ), // 2. Trailing sekarang hanya berisi Text
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              onTap: () {
+                provider.markOneAsRead(notif);
+                FirebaseApi().navigateToTicketDetail(notif.ticketId);
+              },
+            ),
+            if (!notif.isRead)
+              Positioned(
+                // 3. Positioned sekarang berada di dalam Stack utama
+                top: 12, // Sesuaikan posisi vertikal
+                right: 12, // Sesuaikan posisi horizontal
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
   }
 
-  // Widget untuk state kosong (kode dari file asli Anda)
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
@@ -122,10 +143,7 @@ class _NotificationPageState extends State<NotificationPage> {
             Text(
               'Notifikasi baru terkait tiket Anda akan muncul di sini.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
           ],
         ),
