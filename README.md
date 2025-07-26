@@ -210,7 +210,7 @@ Dear hola,
 Your support ticket "tak tau" has been submitted.
 
 Tracking ID: PR7-LBQ-Z1V2  
-[View Ticket](http://localhost/hesk346/ticket.php?track=PR7-LBQ-Z1V2&e=email)
+[View Ticket](http://locallhost/hesk346/ticket.php?track=PR7-LBQ-Z1V2&e=email)
 ```
 
 ### 📥 Balasan dari Staf
@@ -226,7 +226,7 @@ Staf kami telah memberikan balasan untuk tiket Anda:
 Cek  
 Admin melampirkan file.
 
-[Balas Sekarang](http://192.168.1.7/hesk346/ticket.php?track=YN4-TSB-3A8R&e=email)
+[Balas Sekarang](http://locallhost/hesk346/ticket.php?track=YN4-TSB-3A8R&e=email)
 ```
 
 ---
@@ -269,10 +269,6 @@ flutter build apk
 ## 📂 Struktur Folder Penting Server
 
 ```
-├── anri/
-│   ├── android/app/google-services.json
-│   ├── .env                ← konfigurasi Flutter (.env untuk IP API)
-│
 ├── anri_helpdesk_api/
 │   ├── .env                ← konfigurasi backend (DB, SMTP, FCM)
 │   ├── composer.json       ← dependensi PHP
