@@ -128,7 +128,7 @@ try {
           . (!empty($attachments_for_db) ? "<p>Admin Melampirkan File.</p>" : "")
           . "<p>Anda dapat melihat detail dan membalas kembali melalui tautan di bawah ini:<br>"
           . "<a href=\"$tracking_url\">$tracking_url</a></p>"
-          . "<p>Hormat kami,<br>Tim Helpdesk</p>";
+          . "<p>Hormat kami,<br>Tim Helpdesk Arsip Nasional RI</p>";
 
     send_notification_email($ticket_info['customer_email'], $ticket_info['customer_name'], $subject, $body);
     

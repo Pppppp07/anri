@@ -30,7 +30,9 @@ class DocumentationTile extends StatelessWidget {
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
         leading: Icon(icon, color: iconColor, size: 28),
-        title: Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+        title: Text(title,
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
         childrenPadding: EdgeInsets.zero, // Hapus padding default
         children: [
           Padding(
@@ -49,7 +51,8 @@ class FeatureDetail extends StatelessWidget {
   final String title;
   final String description;
 
-  const FeatureDetail({super.key, required this.title, required this.description});
+  const FeatureDetail(
+      {super.key, required this.title, required this.description});
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +62,9 @@ class FeatureDetail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(title,
+              style:
+                  theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(description, style: theme.textTheme.bodyMedium),
         ],
@@ -73,14 +78,16 @@ class DatabaseTableCard extends StatelessWidget {
   final String tableName;
   final String description;
 
-  const DatabaseTableCard({super.key, required this.tableName, required this.description});
+  const DatabaseTableCard(
+      {super.key, required this.tableName, required this.description});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surface.withAlpha(128), // Perbaikan: withOpacity -> withAlpha
+      color: theme.colorScheme.surface
+          .withAlpha(128), // Perbaikan: withOpacity -> withAlpha
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: theme.dividerColor, width: 0.5),
@@ -91,7 +98,9 @@ class DatabaseTableCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tableName, style: theme.textTheme.titleSmall?.copyWith(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+            Text(tableName,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(description, style: theme.textTheme.bodyMedium),
           ],
@@ -138,7 +147,8 @@ class ApiEndpointCard extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surface.withAlpha(128), // Perbaikan: withOpacity -> withAlpha
+      color: theme.colorScheme.surface
+          .withAlpha(128), // Perbaikan: withOpacity -> withAlpha
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: theme.dividerColor, width: 0.5),
@@ -152,21 +162,26 @@ class ApiEndpointCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: methodColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     method,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: SelectableText(
                     endpoint,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontFamily: 'monospace'),
+                    style:
+                        theme.textTheme.bodyLarge?.copyWith(fontFamily: 'monospace'),
                   ),
                 ),
               ],
@@ -193,13 +208,16 @@ class ApiEndpointCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text(title,
+            style: theme.textTheme.labelLarge
+                ?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.black.withAlpha(204), // Perbaikan: withOpacity -> withAlpha
+            color: Colors.black
+                .withAlpha(204), // Perbaikan: withOpacity -> withAlpha
             borderRadius: BorderRadius.circular(8),
           ),
           child: SelectableText(
@@ -233,7 +251,8 @@ class ProviderDetailCard extends StatelessWidget {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 6),
-      color: theme.colorScheme.surface.withAlpha(128), // Perbaikan: withOpacity -> withAlpha
+      color: theme.colorScheme.surface
+          .withAlpha(128), // Perbaikan: withOpacity -> withAlpha
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: theme.dividerColor, width: 0.5),
@@ -303,12 +322,14 @@ class ArchitecturalComponentCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       description,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     )
                   ],
                 ),
@@ -352,14 +373,16 @@ class DataFlowStep extends StatelessWidget {
                 radius: 16,
                 child: Text(
                   step,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
               if (!isLastStep)
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: theme.colorScheme.primary.withAlpha(77), // Perbaikan: withOpacity -> withAlpha
+                    color: theme.colorScheme.primary
+                        .withAlpha(77), // Perbaikan: withOpacity -> withAlpha
                   ),
                 ),
             ],
@@ -375,7 +398,8 @@ class DataFlowStep extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       actor,
-                      style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -408,9 +432,13 @@ class ReleaseChecklistItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Icon(isDone ? Icons.check_box : Icons.check_box_outline_blank, color: isDone ? Colors.green : null),
+          Icon(isDone ? Icons.check_box : Icons.check_box_outline_blank,
+              color: isDone ? Colors.green : null),
           const SizedBox(width: 12),
-          Expanded(child: Text(text, style: TextStyle(decoration: isDone ? TextDecoration.lineThrough : null))),
+          Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      decoration: isDone ? TextDecoration.lineThrough : null))),
         ],
       ),
     );
@@ -448,14 +476,19 @@ class ContactButton extends StatelessWidget {
   }
 }
 
-// Menambahkan widget yang mungkin hilang sebelumnya untuk kelengkapan
+// --- PERBAIKAN UTAMA DI SINI ---
 /// Item untuk legenda visual.
 class LegendItem extends StatelessWidget {
-  final Color color;
-  final IconData? icon;
+  final Color? color;
+  final Widget? leadingWidget; // Menggantikan IconData? icon
   final String label;
 
-  const LegendItem({super.key, required this.color, this.icon, required this.label});
+  const LegendItem({
+    super.key,
+    this.color,
+    this.leadingWidget,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -463,7 +496,12 @@ class LegendItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Icon(icon ?? Icons.circle, color: color, size: 20),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: leadingWidget ?? // Gunakan leadingWidget jika ada
+                Icon(Icons.circle, color: color, size: 20), // Fallback ke ikon lingkaran
+          ),
           const SizedBox(width: 12),
           Expanded(child: Text(label)),
         ],
@@ -486,7 +524,8 @@ class FaqItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Q: $question', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('Q: $question',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('A: $answer'),
         ],
@@ -501,7 +540,11 @@ class StepTile extends StatelessWidget {
   final String title;
   final String description;
 
-  const StepTile({super.key, required this.step, required this.title, required this.description});
+  const StepTile(
+      {super.key,
+      required this.step,
+      required this.title,
+      required this.description});
 
   @override
   Widget build(BuildContext context) {
@@ -513,14 +556,18 @@ class StepTile extends StatelessWidget {
         children: [
           CircleAvatar(
             backgroundColor: theme.colorScheme.primary,
-            child: Text(step, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(step,
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(title,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(description, style: theme.textTheme.bodyMedium),
               ],
@@ -551,7 +598,8 @@ class ProjectStructureItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.folder_outlined, color: theme.colorScheme.secondary, size: 20),
+          Icon(Icons.folder_outlined,
+              color: theme.colorScheme.secondary, size: 20),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -559,7 +607,8 @@ class ProjectStructureItem extends StatelessWidget {
               children: [
                 Text(
                   folderName,
-                  style: theme.textTheme.titleSmall?.copyWith(fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontFamily: 'monospace', fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),
                 Text(

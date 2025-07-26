@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'documentation/tabs/release_guide_tab.dart';
-import 'documentation/tabs/technical_guide_tab.dart';
-import 'documentation/tabs/user_guide_tab.dart';
-// Import 'animated_widgets.dart' tidak diperlukan di sini, jadi kita hapus.
+
+// --- PERBAIKAN DI SINI: Menggunakan prefix 'as' untuk mengatasi konflik ---
+// Kita memberikan "nama panggilan" unik untuk setiap file tab.
+import 'documentation/tabs/user_guide_tab.dart' as user_guide;
+import 'documentation/tabs/technical_guide_tab.dart' as tech_guide;
+import 'documentation/tabs/release_guide_tab.dart' as release_guide;
 
 class DocumentationPage extends StatefulWidget {
   const DocumentationPage({super.key});
@@ -52,13 +54,11 @@ class _DocumentationPageState extends State<DocumentationPage>
       ),
       body: TabBarView(
         controller: _tabController,
-        // --- PERBAIKAN DI SINI ---
-        // Hapus wrapper 'AnimatedContent' dan keyword 'const'.
-        // Widget animasi (StaggeredListView) sudah ada di dalam setiap Tab.
-        children: const [
-          UserGuideTab(),
-          TechnicalGuideTab(),
-          ReleaseGuideTab(),
+        // Sekarang kita memanggil widget menggunakan prefix yang telah kita definisikan.
+        children: [
+          const user_guide.UserGuideTab(),
+          const tech_guide.TechnicalGuideTab(),
+          const release_guide.ReleaseGuideTab(),
         ],
       ),
     );
