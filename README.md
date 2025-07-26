@@ -84,18 +84,18 @@ Salin isi folder `anri/htdocs/hesk346/` ke dalam instalasi HESK Anda untuk menim
 2. Duplikat file `.env.example` menjadi `.env` dan isi:
 
 ```dotenv
-DB_HOST=127.0.0.1
-DB_NAME=hesk_db
-DB_USER=root
+DB_HOST=
+DB_NAME=
+DB_USER=
 DB_PASS=
 
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=buat.testing66@gmail.com
-SMTP_PASS=your_app_password
-SMTP_ENCRYPTION=tls
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_ENCRYPTION=
 
-HESK_URL=http://192.168.1.7/hesk346
+HESK_URL=http://locallhost/hesk346
 ```
 
 3. Jalankan dependensi Composer:
