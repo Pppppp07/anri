@@ -175,11 +175,11 @@ Gunakan akun Gmail uji coba saat development. Untuk produksi, gunakan domain res
 #### a. Konfigurasi `.env`
 
 ```dotenv
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=buat.testing66@gmail.com
-SMTP_PASS=your_app_password
-SMTP_ENCRYPTION=tls
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_ENCRYPTION=
 ```
 
 #### b. Dependensi di `composer.json`&#x20;
