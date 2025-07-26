@@ -258,7 +258,15 @@ flutter build apk
 
 ---
 
-## 📂 Struktur Penting Proyek
+## 📂 Struktur Folder Penting Flutter
+
+```
+├── anri/
+│   ├── android/app/google-services.json           ← Penempatan file google-services.json 
+│   ├── .env                                       ← konfigurasi Flutter (.env untuk IP API)
+```
+
+## 📂 Struktur Folder Penting Server
 
 ```
 ├── anri/
