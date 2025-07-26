@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.anri"
+    namespace = "com.helpdesk.anri"
     ndkVersion = "27.0.12077973"
     compileSdk = 35
     compileOptions {
@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.anri"
+        applicationId = "com.helpdesk.anri"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -2,14 +2,14 @@
 
 import 'dart:convert';
 import 'package:anri/config/api_config.dart';
-import 'package:anri/main.dart';
+import 'package:anri/main.dart'; // <-- [TAMBAHAN 1] Import main.dart untuk akses 'channel'
 import 'package:anri/models/ticket_model.dart';
 import 'package:anri/pages/ticket_detail_screen.dart';
 import 'package:anri/providers/app_data_provider.dart';
 import 'package:anri/providers/notification_provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+// --- [TAMBAHAN 2] Import package notifikasi lokal ---
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -24,49 +24,10 @@ Future<Map<String, String>> _getAuthHeaders() async {
 
 class FirebaseApi {
   final _firebaseMessaging = FirebaseMessaging.instance;
-  final _localNotifications = FlutterLocalNotificationsPlugin();
-
-  final _androidChannel = const AndroidNotificationChannel(
-    'high_importance_channel',
-    'High Importance Notifications',
-    description: 'This channel is used for important notifications.',
-    importance: Importance.high,
-  );
-
-  // Fungsi terpusat untuk menampilkan notifikasi
-  Future<void> showLocalNotification(RemoteMessage message) async {
-    await initLocalNotifications();
-
-    final String title = message.data['title'] ?? 'Notifikasi Baru';
-    final String body = message.data['body'] ?? 'Anda memiliki pesan baru.';
-    final String? ticketId = message.data['ticket_id'];
-
-    // --- [PERBAIKAN UTAMA DI SINI] ---
-    // ID unik dibuat dari `millisecondsSinceEpoch` namun dibatasi agar sesuai dengan integer 32-bit.
-    final int notificationId = DateTime.now().millisecondsSinceEpoch.toSigned(
-      31,
-    );
-
-    _localNotifications.show(
-      notificationId,
-      title,
-      body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
-          icon: '@drawable/ic_notification',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      ),
-      payload: ticketId,
-    );
-  }
 
   // Method navigateToTicketDetail tetap sama
   Future<void> navigateToTicketDetail(String ticketId) async {
+    // ... (Tidak ada perubahan di dalam fungsi ini, biarkan seperti semula)
     if (ticketId == '0' || navigatorKey.currentContext == null) return;
     final context = navigatorKey.currentContext!;
     showDialog(
@@ -160,17 +121,24 @@ class FirebaseApi {
     }
   }
 
-  Future<void> initNotifications() async {
+  // --- [PERUBAHAN 1] Modifikasi initNotifications ---
+  // Sekarang menerima instance plugin notifikasi lokal sebagai argumen.
+  Future<void> initNotifications(
+      FlutterLocalNotificationsPlugin localNotificationsPlugin) async {
     await _firebaseMessaging.requestPermission();
     final fcmToken = await _firebaseMessaging.getToken();
+    debugPrint('FCM Token: $fcmToken');
     if (fcmToken != null) {
       await _sendTokenToServer(fcmToken);
     }
     _firebaseMessaging.onTokenRefresh.listen(_sendTokenToServer);
-    initPushNotifications();
+
+    // Kirim instance plugin ke handler notifikasi push
+    initPushNotifications(localNotificationsPlugin);
   }
 
   Future<void> _sendTokenToServer(String token) async {
+    // ... (Tidak ada perubahan di dalam fungsi ini)
     final headers = await _getAuthHeaders();
     if (headers.isEmpty) return;
     final url = Uri.parse('${ApiConfig.baseUrl}/update_fcm_token.php');
@@ -188,53 +156,68 @@ class FirebaseApi {
     }
   }
 
+  // --- [PERUBAHAN 2] Modifikasi initPushNotifications ---
+  Future<void> initPushNotifications(
+      FlutterLocalNotificationsPlugin localNotificationsPlugin) async {
+    // Handler untuk notifikasi yang di-tap (dari background)
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
+
+    // Handler untuk notifikasi yang di-tap (dari terminated/ditutup)
+    FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
+
+    // --- [PERUBAHAN UTAMA] Listener untuk notifikasi yang masuk saat aplikasi di FOREGROUND ---
+    FirebaseMessaging.onMessage.listen((message) {
+      final notification = message.notification;
+      if (notification == null) return;
+
+      // Tambahkan notifikasi ke riwayat provider
+      final context = navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        Provider.of<NotificationProvider>(context, listen: false)
+            .addNotification(message);
+      }
+
+      // Tampilkan notifikasi mengambang menggunakan flutter_local_notifications
+      localNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channel.id, // <-- Gunakan ID kanal dari main.dart
+            channel.name,
+            channelDescription: channel.description,
+            icon: '@drawable/ic_notification', // Pastikan nama ikon ini benar
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ),
+        // Payload berisi ticket_id agar bisa di-handle saat di-tap
+        payload: json.encode(message.data),
+      );
+
+      debugPrint(
+        'Pesan diterima di foreground: ${notification.title}, ${notification.body}',
+      );
+    });
+  }
+
+  // Inisialisasi plugin notifikasi lokal (untuk onTap)
   Future<void> initLocalNotifications() async {
     const android = AndroidInitializationSettings('@drawable/ic_notification');
     const settings = InitializationSettings(android: android);
-
-    await _localNotifications.initialize(
+    await flutterLocalNotificationsPlugin.initialize(
       settings,
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
-        if (payload != null && payload != '0') {
-          navigateToTicketDetail(payload);
+        if (payload != null) {
+          final data = json.decode(payload);
+          final ticketId = data['ticket_id'];
+          if (ticketId != null) {
+            navigateToTicketDetail(ticketId);
+          }
         }
       },
     );
-
-    final platform = _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    await platform?.createNotificationChannel(_androidChannel);
-  }
-
-  Future<void> initPushNotifications() async {
-    await initLocalNotifications();
-
-    // Foreground handler
-    FirebaseMessaging.onMessage.listen((message) {
-      debugPrint('[FIREBASE API] Foreground notification received.');
-
-      // --- AWAL PERBAIKAN ---
-      // Tambahkan notifikasi ke provider agar masuk ke riwayat di halaman notifikasi
-      final context = navigatorKey.currentContext;
-      if (context != null && context.mounted) {
-        Provider.of<NotificationProvider>(
-          context,
-          listen: false,
-        ).addNotification(message);
-      }
-      // --- AKHIR PERBAIKAN ---
-
-      // Tampilkan notifikasi lokal seperti biasa
-      showLocalNotification(message);
-    });
-
-    // Handler saat notifikasi di-tap (dari background)
-    FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
-
-    // Handler saat notifikasi di-tap (dari terminated)
-    FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
   }
 }

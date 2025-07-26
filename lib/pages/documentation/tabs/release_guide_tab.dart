@@ -1,60 +1,365 @@
-import 'package:flutter/material.dart';
-import '../widgets/header_card.dart';
-import '../widgets/content_widgets.dart';
-import '../widgets/animated_widgets.dart';
+// lib/pages/documentation/tabs/release_guide_tab.dart
 
+import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Widget ini menampilkan konten dari file README.md sebagai tab "Catatan Rilis".
+/// Ini mencakup semua detail proyek, dari fitur hingga panduan instalasi.
 class ReleaseGuideTab extends StatelessWidget {
   const ReleaseGuideTab({super.key});
 
+  // Konten lengkap dari file README.md proyek.
+  // Menggunakan raw string (r"""...""") untuk menghindari masalah dengan karakter khusus.
+  final String readmeContent = r"""
+# 📱 ANRI Helpdesk Mobile
+
+Aplikasi mobile (Android) untuk staf teknis di **Arsip Nasional Republik Indonesia (ANRI)** dalam menangani tiket dukungan. Terintegrasi dengan **HESK Helpdesk**, aplikasi ini dilengkapi dengan **notifikasi real-time** melalui Firebase, Telegram, dan Email, serta sistem pelaporan terstruktur yang fleksibel.
+
+---
+
+## ✨ Fitur Utama
+
+* **Manajemen Tiket**: Membuka, membalas, dan memperbarui status, prioritas, dan kategori tiket secara langsung dari ponsel.
+* **Notifikasi Real-time**:
+
+  * 🔔 Firebase: Push notification ke aplikasi Flutter.
+  * 📩 Telegram: Pesan instan ke grup staf Helpdesk.
+  * 📧 Email: Terkirim otomatis ke pelapor tiket.
+* **Autentikasi Aman**: Login menggunakan sistem token JWT.
+* **Pelacakan Waktu**: Monitor lama pengerjaan tiket.
+* **Pencarian & Filter**: Temukan tiket dengan mudah berdasarkan status, prioritas, dan kata kunci.
+* **Deep Link Mobile** (NOT YET UPDATED): Tautan dari Telegram membuka aplikasi langsung ke halaman tiket.
+
+---
+
+## ⚙️ Teknologi
+
+| Komponen         | Teknologi                         |
+| ---------------- | --------------------------------- |
+| Frontend         | Flutter (v3.x)                    |
+| Backend          | PHP 8.1+, HESK v3.4.6             |
+| API              | RESTful API dengan Composer       |
+| Database         | MySQL / MariaDB                   |
+| Push Notifikasi  | Firebase Cloud Messaging          |
+| Grup Notifikasi  | Telegram Bot + Group              |
+| Email Notifikasi | PHPMailer + SMTP                  |
+| Web Server Lokal | XAMPP / Laragon (🛠️ Development) |
+
+---
+
+## 📋 Prasyarat
+
+* Flutter SDK v3.x
+* Composer
+* Node.js & npm
+* Firebase CLI & FlutterFire CLI
+* Akun Google (Firebase)
+* Akun Telegram & Bot
+* SMTP aktif (Gmail / Domain resmi)
+* Web Server lokal seperti XAMPP 🛠️
+
+---
+
+## 🚀 Langkah Instalasi
+
+### 1. Clone Proyek
+
+```bash
+git clone https://github.com/Pppppp07/anri.git
+cd anri
+```
+
+---
+
+### 2. Setup Backend (HESK + API)
+
+#### a. Install HESK (Optional Jika belum ada HESK)
+
+* Unduh dan instal [HESK v3.4.6](https://www.hesk.com/) ke direktori `htdocs/hesk/`.
+
+#### b. Salin File Modifikasi
+
+🛠️ **\[Development Only]**
+Salin isi folder `anri/htdocs/hesk346/` ke dalam instalasi HESK Anda untuk menimpa file bawaan.
+**File yang dimodifikasi:**
+
+* `anri_custom_functions.inc.php`
+* `submit_ticket.php`
+* `reply_ticket.php`
+* `admin/admin_submit_ticket.php`
+* `hesk_settings.inc.php`
+
+#### c. Konfigurasi API
+
+🛠️ **\[Development Only]**
+
+1. Pindahkan folder `anri_helpdesk_api/` ke dalam `htdocs/`
+2. Duplikat file `.env.example` menjadi `.env` dan isi:
+
+```dotenv
+DB_HOST=
+DB_NAME=
+DB_USER=
+DB_PASS=
+
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_ENCRYPTION=
+
+HESK_URL=http://locallhost/hesk346
+```
+
+3. Jalankan dependensi Composer:
+
+```bash
+cd anri_helpdesk_api
+composer install
+```
+
+#### d. Modifikasi Struktur Database
+
+🛠️ **\[Development Only]**
+
+```sql
+ALTER TABLE hesk_users ADD fcm_token TEXT NULL DEFAULT NULL;
+ALTER TABLE hesk_tickets MODIFY priority TINYINT(1) NOT NULL DEFAULT 3;
+```
+
+---
+
+### 3. Setup Telegram Bot
+
+1. Buat bot di Telegram menggunakan @BotFather → dapatkan `BOT_TOKEN`
+2. Buat grup dan undang bot → dapatkan `CHAT_ID` melalui:
+
+   ```
+   https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
+   ```
+3. Tambahkan konfigurasi ke `hesk_settings.inc.php`:
+
+```php
+$hesk_settings['telegram_token'] = 'TOKEN_BOT';
+$hesk_settings['telegram_chat_id'] = 'CHAT_ID';
+```
+
+---
+
+### 4. Integrasi Firebase FCM
+
+#### a. Firebase Console
+
+* Buat proyek baru → Tambahkan aplikasi Android
+* Unduh `google-services.json` → Letakkan di `anri/android/app/`
+
+#### b. Kunci Private (FCM Server)
+
+* Unduh dari menu *Service Account*
+* Simpan sebagai `service-account-key.json` di folder `anri_helpdesk_api/`
+
+#### c. Instal CLI & Konfigurasi
+
+```bash
+npm install -g firebase-tools
+dart pub global activate flutterfire_cli
+firebase login
+flutterfire configure
+```
+
+#### d. Tambahkan SHA-256 Fingerprint
+
+🐞 **\[Debugging Tip]**
+
+```bash
+cd android
+./gradlew signingReport
+```
+
+Tambahkan SHA ke Firebase Console untuk `debug` dan `release`.
+
+---
+
+### 5. Setup Email (SMTP)
+
+🛠️ **\[Development Only]**
+Gunakan akun Gmail uji coba saat development. Untuk produksi, gunakan domain resmi ANRI.
+
+#### a. Konfigurasi `.env`
+
+```dotenv
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+SMTP_ENCRYPTION=
+```
+
+#### b. Dependensi di `composer.json`&#x20;
+
+```json
+{
+  "require": {
+    "phpmailer/phpmailer": "^6.8",
+    "vlucas/phpdotenv": "^5.6",
+    "firebase/php-jwt": "^6.10",
+    "google/apiclient": "^2.15.0"
+  }
+}
+```
+
+---
+
+## 📧 Contoh Email Notifikasi
+
+### 📤 Tiket Baru
+
+```text
+From: Help Desk <buat.testing66@gmail.com>
+Subject: Your Ticket Has Been Submitted
+
+Dear hola,
+
+Your support ticket "tak tau" has been submitted.
+
+Tracking ID: PR7-LBQ-Z1V2  
+[View Ticket](http://locallhost/hesk346/ticket.php?track=PR7-LBQ-Z1V2&e=email)
+```
+
+### 📥 Balasan dari Staf
+
+```text
+From: Help Desk Mobile <buat.testing66@gmail.com>
+Subject: Tanggapan Tiket Anda
+
+Yth. kidul,
+
+Staf kami telah memberikan balasan untuk tiket Anda:
+
+Cek  
+Admin melampirkan file.
+
+[Balas Sekarang](http://locallhost/hesk346/ticket.php?track=YN4-TSB-3A8R&e=email)
+```
+
+---
+
+## 🧪 Troubleshooting
+
+| Masalah                    | Solusi                                                                   |
+| -------------------------- | ------------------------------------------------------------------------ |
+| 🔁 API 404                 | 🛠️ Pastikan `.htaccess` aktif dan `mod_rewrite` diaktifkan              |
+| 🔔 Notifikasi tidak muncul | Periksa token FCM, file `service-account-key.json`, dan log PHP          |
+| 📧 Email gagal terkirim    | Periksa kredensial SMTP di `.env` dan gunakan App Password Gmail         |
+| ❌ Firebase CLI error       | Restart terminal setelah install `flutterfire_cli` atau `firebase-tools` |
+
+---
+
+## ✅ Menjalankan Aplikasi
+
+🛠️ **\[Development Only]**
+
+```bash
+flutter run
+```
+
+Untuk produksi:
+
+```bash
+flutter build apk
+```
+
+---
+
+## 📂 Struktur Folder Penting Flutter
+
+```
+├── anri/
+│   ├── android/app/google-services.json           ← Penempatan file google-services.json 
+│   ├── .env                                       ← konfigurasi Flutter (.env untuk IP API)
+```
+
+## 📂 Struktur Folder Penting Server
+
+```
+├── anri_helpdesk_api/
+│   ├── .env                ← konfigurasi backend (DB, SMTP, FCM)
+│   ├── composer.json       ← dependensi PHP
+│   ├── service-account-key.json
+│
+├── hesk/
+│   ├── submit_ticket.php
+│   ├── reply_ticket.php
+│   ├── anri_custom_functions.inc.php
+│   ├── .htaccess           ← 🧪 mod_rewrite untuk REST API
+```
+
+---
+
+## 📚 Referensi
+
+* [HESK Helpdesk](https://www.hesk.com)
+* [FlutterFire CLI](https://firebase.flutter.dev/docs/cli)
+* [Telegram Bot API](https://core.telegram.org/bots/api)
+* [PHPMailer](https://github.com/PHPMailer/PHPMailer)
+* [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging)
+* [ANRI HELPDESK MOBILE DEVELOPMENT](https://drive.google.com/drive/folders/10xonumW9Dgq1v4bRbI0NqJ21nR3BTyKi?usp=sharing)
+
+---
+
+## 📝 Lisensi
+
+© Arsip Nasional Republik Indonesia – 2025. All rights reserved.
+
+""";
+
   @override
   Widget build(BuildContext context) {
-    return StaggeredListView(
-      children: const [
-        HeaderCard(
-          title: 'Panduan Rilis & Kredit',
-          subtitle: 'Informasi tim pengembang dan langkah-langkah untuk merilis versi baru aplikasi.',
-        ),
-         DocumentationTile(
-          icon: Icons.checklist_rtl_outlined,
-          iconColor: Colors.green,
-          title: 'Checklist Persiapan Rilis',
-          initiallyExpanded: true,
-          children: [
-            ReleaseChecklistItem(isDone: true, text: 'Pastikan file `.env` diisi dengan URL API produksi.'),
-            ReleaseChecklistItem(isDone: false, text: 'Ganti Application ID di `build.gradle.kts` dari "com.example.anri" ke ID resmi (misal: id.go.anri.helpdesk).'),
-            ReleaseChecklistItem(isDone: false, text: 'Perbarui `version` di `pubspec.yaml` (misal: 1.0.1+2).'),
-            ReleaseChecklistItem(isDone: true, text: 'Hapus semua statement `debugPrint()` dari kode.'),
-            ReleaseChecklistItem(isDone: false, text: 'Ganti ikon aplikasi di `android` dan `ios` dengan aset final dari ANRI.'),
-            ReleaseChecklistItem(isDone: false, text: 'Pastikan file `google-services.json` dan `service-account-key.json` menggunakan konfigurasi Firebase produksi.'),
-          ],
-        ),
-         DocumentationTile(
-          icon: Icons.terminal_outlined,
-          iconColor: Colors.blueGrey,
-          title: 'Perintah Build (CLI)',
-          children: [
-            FeatureDetail(
-              title: 'Build Android (APK)',
-              description: 'Jalankan perintah berikut di terminal dari root proyek:\n`flutter build apk --release`\n\nHasilnya akan berada di `build/app/outputs/flutter-apk/app-release.apk`.'
+    // Menggunakan widget Markdown untuk merender konten.
+    return Markdown(
+      padding: const EdgeInsets.all(16.0),
+      data: readmeContent,
+      selectable: true, // Memungkinkan teks untuk disalin.
+      onTapLink: (text, href, title) {
+        // Logika untuk membuka tautan saat diklik.
+        // Memeriksa apakah 'href' tidak null sebelum mencoba membuka URL.
+        if (href != null) {
+          launchUrl(Uri.parse(href));
+        }
+      },
+      // Kustomisasi tampilan elemen Markdown agar sesuai dengan tema aplikasi.
+      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+        p: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15),
+        h1: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 28,
             ),
-             FeatureDetail(
-              title: 'Build iOS',
-              description: 'Jalankan perintah berikut di terminal (membutuhkan macOS & Xcode):\n`flutter build ios --release`\n\nBuka `ios/Runner.xcworkspace` di Xcode untuk mengarsipkan dan mendistribusikan aplikasi.'
+        h2: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
             ),
-          ],
+        h3: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+        codeblockDecoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[800]
+              : Colors.grey[200],
+          borderRadius: BorderRadius.circular(8.0),
+          border: Border.all(
+            color: Theme.of(context).dividerColor,
+          ),
         ),
-        DocumentationTile(
-          icon: Icons.history_edu_outlined,
-          iconColor: Colors.indigo,
-          title: 'Proses & Tim Pengembangan',
-          children: [
-            FeatureDetail(title: 'Latar Belakang', description: 'Aplikasi ini dikembangkan sebagai bagian dari program magang [Nama Program Magang/Universitas Anda] di Arsip Nasional Republik Indonesia pada tahun 2025.'),
-            FeatureDetail(title: 'Tim Pengembang (Magang)', description: '[Nama Lengkap Anda]\n[Nama Lengkap Anggota Tim 2]\n[Nama Lengkap Anggota Tim 3]'),
-            FeatureDetail(title: 'Pembimbing', description: '[Nama Lengkap Pembimbing/Mentor di ANRI]'),
-            FeatureDetail(title: 'Hak Cipta', description: '© 2025 Arsip Nasional Republik Indonesia. Seluruh hak cipta atas kode sumber dan aset aplikasi ini dimiliki oleh ANRI.'),
-          ],
+        tableBorder: TableBorder.all(
+          color: Theme.of(context).dividerColor,
+          width: 1,
         ),
-      ],
+        tableHead: const TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
