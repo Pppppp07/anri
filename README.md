@@ -52,8 +52,8 @@ Aplikasi mobile (Android) untuk staf teknis di **Arsip Nasional Republik Indones
 ### 1. Clone Proyek
 
 ```bash
-git clone https://github.com/username/anri-helpdesk-mobile.git
-cd anri-helpdesk-mobile
+git clone https://github.com/Pppppp07/anri.git
+cd anri
 ```
 
 ---
@@ -286,5 +286,6 @@ flutter build apk
 * [Telegram Bot API](https://core.telegram.org/bots/api)
 * [PHPMailer](https://github.com/PHPMailer/PHPMailer)
 * [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging)
+* [ANRI HELPDESK MOBILE DEVELOPMENT](https://drive.google.com/drive/folders/10xonumW9Dgq1v4bRbI0NqJ21nR3BTyKi?usp=sharing)
 
 ---
