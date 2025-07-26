@@ -152,6 +152,7 @@ npm install -g firebase-tools
 dart pub global activate flutterfire_cli
 firebase login
 flutterfire configure
+flutter create . --platforms=android
 ```
 
 #### d. Tambahkan SHA-256 Fingerprint
