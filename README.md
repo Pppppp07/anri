@@ -293,3 +293,7 @@ flutter build apk
 * [ANRI HELPDESK MOBILE DEVELOPMENT](https://drive.google.com/drive/folders/10xonumW9Dgq1v4bRbI0NqJ21nR3BTyKi?usp=sharing)
 
 ---
+
+## 📝 Lisensi
+
+© Arsip Nasional Republik Indonesia – 2025. All rights reserved.
