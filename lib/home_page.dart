@@ -288,9 +288,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           return Badge(
                             isLabelVisible: notifProvider.unreadCount > 0,
                             label: Text(notifProvider.unreadCount.toString()),
+                            offset: const Offset(
+                              -6,
+                              6,
+                            ), // Sesuaikan offset untuk ikon yang lebih besar
+                            alignment: Alignment.topRight,
                             child: IconButton(
-                              icon: const Icon(
-                                Icons.notifications_none_outlined,
+                              padding: EdgeInsets
+                                  .zero, // Hapus padding default agar lebih presisi
+                              icon: const SizedBox(
+                                // Bungkus Icon dengan SizedBox
+                                width: 32, // Atur lebar ikon
+                                height: 32, // Atur tinggi ikon
+                                child: Icon(
+                                  Icons.notifications_none_outlined,
+                                  size: 30, // Perbesar ukuran ikon
+                                ),
                               ),
                               tooltip: 'Notifikasi',
                               onPressed: () {
