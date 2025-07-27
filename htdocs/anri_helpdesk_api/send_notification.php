@@ -27,7 +27,7 @@ if ($argc < 5) {
 $user_id   = (int)$argv[1];
 $title     = $argv[2];
 $body      = $argv[3];
-$ticket_id = $argv[4];
+$ticket_id = (int)$argv[4];
 
 // Muat semua dependensi SEBELUM memanggil file lain yang membutuhkannya.
 require_once __DIR__ . '/vendor/autoload.php';
@@ -37,8 +37,24 @@ require_once __DIR__ . '/koneksi.php';
 
 log_fcm_activity("--- Memulai proses untuk User ID: {$user_id}, Tiket ID: {$ticket_id} ---");
 
+
+// --- [PENAMBAHAN] Ambil Track ID dari database ---
+$sql_trackid = "SELECT `trackid` FROM `hesk_tickets` WHERE `id` = ? LIMIT 1";
+$stmt_trackid = mysqli_prepare($conn, $sql_trackid);
+mysqli_stmt_bind_param($stmt_trackid, 'i', $ticket_id);
+mysqli_stmt_execute($stmt_trackid);
+$result_trackid = mysqli_stmt_get_result($stmt_trackid);
+$track_id = 'N/A';
+if ($row = mysqli_fetch_assoc($result_trackid)) {
+    $track_id = $row['trackid'];
+}
+mysqli_stmt_close($stmt_trackid);
+log_fcm_activity("Track ID ditemukan: {$track_id}");
+// --- [AKHIR PENAMBAHAN] ---
+
+
 // --- Fungsi Utama Pengiriman FCM ---
-function send_fcm_notification_final(mysqli $conn, int $user_id, string $title, string $body, string $ticket_id) {
+function send_fcm_notification_final(mysqli $conn, int $user_id, string $title, string $body, int $ticket_id, string $track_id) {
     
     // 1. Ambil FCM token dari database.
     $sql = "SELECT `fcm_token` FROM `hesk_users` WHERE `id` = ? AND `fcm_token` IS NOT NULL AND `fcm_token` != '' LIMIT 1";
@@ -86,19 +102,42 @@ function send_fcm_notification_final(mysqli $conn, int $user_id, string $title, 
 
     $fcmApiUrl = 'https://fcm.googleapis.com/v1/projects/' . $projectId . '/messages:send';
 
-    // 3. Buat Payload Notifikasi. (*** INI BAGIAN YANG DIUBAH ***)
+    // --- [PERUBAHAN UTAMA DI SINI] ---
+    // Buat Payload Notifikasi dengan prioritas tinggi dan channel ID
     $message = [
         'message' => [
             'token' => $token,
-            // 'notification' key DIHAPUS.
             'data' => [
-                'title' => $title, // title dipindahkan ke dalam 'data'
-                'body' => $body,   // body dipindahkan ke dalam 'data'
+                'title' => $title,
+                'body' => $body,
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK', 
-                'ticket_id' => (string)$ticket_id
-            ]
+                'ticket_id' => (string)$ticket_id,
+                'track_id' => $track_id,
+            ],
+'android' => [
+    'priority' => 'high',
+    'notification' => [
+        'title'      => $title, // <-- TAMBAHKAN BARIS INI
+        'body'       => $body,  // <-- TAMBAHKAN BARIS INI
+        'channel_id' => 'high_importance_channel'
+    ]
+],
+            // Opsi APNs (untuk iOS) bisa ditambahkan di sini jika perlu
+            'apns' => [
+                'headers' => [
+                    'apns-priority' => '10', // Prioritas tinggi untuk iOS
+                ],
+                'payload' => [
+                    'aps' => [
+                        'sound' => 'default',
+                        'content-available' => 1,
+                    ],
+                ],
+            ],
         ]
     ];
+    // --- [AKHIR PERUBAHAN UTAMA] ---
+
     log_fcm_activity("Payload dibuat: " . json_encode($message));
 
     // 4. Kirim request ke FCM API.
@@ -125,9 +164,9 @@ function send_fcm_notification_final(mysqli $conn, int $user_id, string $title, 
 }
 
 // --- Panggil Fungsi Utama ---
-send_fcm_notification_final($conn, $user_id, $title, $body, $ticket_id);
+// [PERUBAHAN] Kirimkan $track_id ke fungsi
+send_fcm_notification_final($conn, $user_id, $title, $body, $ticket_id, $track_id);
 log_fcm_activity("--- Proses Selesai --- \n");
 
 // Tutup koneksi database
 mysqli_close($conn);
-?>

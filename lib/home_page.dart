@@ -1,7 +1,6 @@
 // lib/home_page.dart
 
 import 'dart:async';
-import 'package:anri/main.dart'; // <-- [PERBAIKAN 1] Tambahkan import 'main.dart'
 import 'package:anri/services/firebase_api.dart';
 import 'package:anri/pages/error_page.dart';
 import 'package:anri/pages/home/widgets/ticket_card.dart';
@@ -15,7 +14,6 @@ import 'package:anri/providers/ticket_provider.dart';
 import 'package:anri/utils/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // <-- [PERBAIKAN 2] Tambahkan import
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -81,13 +79,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // --- [PERBAIKAN 3] HAPUS inisialisasi notifikasi dari sini ---
-      // context.read<FirebaseApi>().initNotifications(); 
-      // Inisialisasi ini sekarang terjadi di SplashScreen.
-      
-      // Inisialisasi lokal notifikasi untuk menangani tap pada notifikasi foreground
-      context.read<FirebaseApi>().initLocalNotifications();
-      
+      context.read<FirebaseApi>().initNotifications();
       context.read<AppDataProvider>().fetchTeamMembers();
       _triggerSearch();
       _startAutoRefreshTimer();
@@ -101,26 +93,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
 
     _scrollController.addListener(() {
-      if (!_scrollController.hasClients) {
-        return;
-      }
+      if (!_scrollController.hasClients) return;
 
       final direction = _scrollController.position.userScrollDirection;
       final offset = _scrollController.position.pixels;
 
-      // --- [PERBAIKAN 4] Tambahkan kurung kurawal pada if statements ---
       if (offset < 200) {
-        if (_fabState != FabState.hidden) {
+        if (_fabState != FabState.hidden)
           setState(() => _fabState = FabState.hidden);
-        }
       } else if (direction == ScrollDirection.reverse) {
-        if (_fabState != FabState.filter) {
+        if (_fabState != FabState.filter)
           setState(() => _fabState = FabState.filter);
-        }
       } else if (direction == ScrollDirection.forward) {
-        if (_fabState != FabState.scrollToTop) {
+        if (_fabState != FabState.scrollToTop)
           setState(() => _fabState = FabState.scrollToTop);
-        }
       }
     });
   }
@@ -139,8 +125,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    // Jika aplikasi kembali dari background atau dibuka (setelah splash screen)
     if (state == AppLifecycleState.resumed) {
       if (mounted) {
+        // Panggil provider untuk memuat ulang data terbaru dari penyimpanan
         context.read<NotificationProvider>().loadNotifications();
       }
     }
@@ -154,31 +142,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final isHomePage = _selectedIndex == 0;
 
     context.read<TicketProvider>().fetchTickets(
-          status: _getStatusForAPI(),
-          category: isHomePage ? _homeCategory : _historyCategory,
-          searchQuery: _searchController.text,
-          priority: isHomePage ? _homePriority : _historyPriority,
-          assignee: assigneeParam,
-          isRefresh: true,
-        );
+      status: _getStatusForAPI(),
+      category: isHomePage ? _homeCategory : _historyCategory,
+      searchQuery: _searchController.text,
+      priority: isHomePage ? _homePriority : _historyPriority,
+      assignee: assigneeParam,
+      isRefresh: true,
+    );
   }
 
   String _getStatusForAPI() {
-    if (_selectedIndex == 1) {
-      return 'Resolved';
-    }
-    // --- [PERBAIKAN 4] Tambahkan kurung kurawal ---
-    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe) {
+    if (_selectedIndex == 1) return 'Resolved';
+    if (_selectedIndex == 0 && _currentView == TicketView.assignedToMe)
       return 'Active';
-    }
-    if (_selectedStatus == 'Semua Status') {
-      return 'All';
-    }
+    if (_selectedStatus == 'Semua Status') return 'All';
     return _selectedStatus;
   }
 
-  // --- [PERBAIKAN 5] Hapus fungsi _logout yang tidak digunakan ---
-  
+  Future<void> _logout({String? message}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('rememberMe') ?? false;
+    final username = prefs.getString('user_username');
+
+    await prefs.clear();
+
+    if (rememberMe && username != null) {
+      await prefs.setBool('rememberMe', true);
+      await prefs.setString('user_username', username);
+    }
+
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (Route<dynamic> route) => false,
+    );
+    if (message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _startAutoRefreshTimer() {
     _autoRefreshTimer?.cancel();
     if (!mounted) return;
@@ -198,7 +203,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
 
       final ticketProvider = context.read<TicketProvider>();
-      final shouldRefresh = _selectedIndex != 2 &&
+      final shouldRefresh =
+          _selectedIndex != 2 &&
           _searchController.text.isEmpty &&
           ticketProvider.listState != ListState.loading &&
           !ticketProvider.isLoadingMore;
@@ -253,9 +259,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // ... Sisa dari build method Anda tetap sama ...
-    // ... Tidak perlu mengubah apa pun di sini ...
-    // --- [PERBAIKAN 6] Ganti .withOpacity() dengan .withAlpha() ---
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final pageBackgroundDecoration = BoxDecoration(
       gradient: LinearGradient(
@@ -410,6 +413,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  // Ganti seluruh method _buildBody dengan ini
   Widget _buildBody() {
     final appDataProvider = context.watch<AppDataProvider>();
 
@@ -725,7 +729,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       side: BorderSide(
                         color: _selectedStatus == status
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.outline.withAlpha(128),
+                            : Theme.of(
+                                context,
+                              ).colorScheme.outline.withOpacity(0.5),
                         width: 1.0,
                       ),
                     ),
@@ -741,16 +747,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   bool get _areAdvancedFiltersActive {
+    // Cek apakah di halaman Beranda atau Riwayat
     if (_selectedIndex == 0) {
+      // Halaman Beranda
+      // Filter dianggap aktif jika kategori atau prioritas BUKAN 'All'
       return _homeCategory != 'All' || _homePriority != 'All';
     } else if (_selectedIndex == 1) {
+      // Halaman Riwayat
+      // Sama, filter aktif jika kategori atau prioritas BUKAN 'All'
       return _historyCategory != 'All' || _historyPriority != 'All';
     }
+    // Tidak ada filter untuk halaman lain
     return false;
   }
 
+  // Ganti seluruh method _showFilterDialog dengan ini
   void _showFilterDialog() {
-    // ... Sisa dari _showFilterDialog method Anda tetap sama ...
     final appDataProvider = context.read<AppDataProvider>();
     final isHomePage = _selectedIndex == 0;
     String tempCategory = isHomePage ? _homeCategory : _historyCategory;

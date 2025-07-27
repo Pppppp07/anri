@@ -1,23 +1,20 @@
-// test/widget_test.dart
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:anri/main.dart';
-import 'package:anri/pages/login_page.dart'; // Import halaman login sebagai halaman awal palsu
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // --- [PERBAIKAN DI SINI] ---
-    // Sekarang kita memberikan widget LoginPage() sebagai halaman awal
-    // untuk memenuhi persyaratan parameter `initialPage`.
-    await tester.pumpWidget(const MyApp(
-      initialPage: LoginPage(), // Anda bisa gunakan halaman apa pun di sini
-    ));
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
 
-    // Kode pengujian di bawah ini adalah contoh bawaan Flutter.
-    // Anda bisa membiarkannya atau menghapusnya jika tidak relevan.
-    
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);
     expect(find.text('1'), findsNothing);

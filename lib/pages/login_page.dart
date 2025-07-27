@@ -1,9 +1,13 @@
+// lib/pages/login_page.dart
+
 import 'package:anri/home_page.dart';
+import 'package:anri/services/firebase_api.dart'; // <-- [PERBAIKAN 1] Tambahkan import FirebaseApi
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart'; // <-- [PERBAIKAN 2] Tambahkan import Provider
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anri/config/api_config.dart';
 
@@ -76,29 +80,25 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   }
 
   Future<void> _saveCredentials({
-  required Map<String, dynamic> userData,
-  required String token,
-}) async {
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('isLoggedIn', true);
-  await prefs.setInt('user_id', userData['id']);
-  await prefs.setString('user_name', userData['name']);
-  await prefs.setString('user_email', userData['email']);
-  await prefs.setString('auth_token', token);
-  await prefs.setBool('rememberMe', _rememberMe);
+    required Map<String, dynamic> userData,
+    required String token,
+  }) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    await prefs.setInt('user_id', userData['id']);
+    await prefs.setString('user_name', userData['name']);
+    await prefs.setString('user_email', userData['email']);
+    await prefs.setString('auth_token', token);
+    await prefs.setBool('rememberMe', _rememberMe);
 
-  // --- [AWAL PERUBAHAN LOGIKA] ---
-  // Jika 'Ingat Saya' dicentang, simpan username untuk login berikutnya.
-  // Jika tidak dicentang, hapus username yang mungkin tersimpan sebelumnya.
-  if (_rememberMe) {
-    await prefs.setString('user_username', userData['username']);
-  } else {
-    await prefs.remove('user_username');
+    if (_rememberMe) {
+      await prefs.setString('user_username', userData['username']);
+    } else {
+      await prefs.remove('user_username');
+    }
   }
-  // --- [AKHIR PERUBAHAN LOGIKA] ---
-}
 
-  void _handleLogin() async {
+  Future<void> _handleLogin() async {
     HapticFeedback.lightImpact();
 
     if (_formKey.currentState!.validate()) {
@@ -133,6 +133,14 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
           if (authToken != null) {
             await _saveCredentials(userData: userData, token: authToken);
+
+            // --- [PERBAIKAN 3: INISIALISASI ULANG NOTIFIKASI] ---
+            // Panggil initNotifications SETELAH kredensial (terutama auth_token) disimpan.
+            // Ini akan mendapatkan token FCM baru dan mengirimkannya ke server dengan sesi yang valid.
+            if (mounted) {
+              await context.read<FirebaseApi>().initNotifications();
+            }
+            // --- [AKHIR PERBAIKAN] ---
             
             if (mounted) {
               Navigator.pushReplacement(
@@ -312,7 +320,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // --- PERBAIKAN TOTAL PADA CHECKBOX DAN TEKS ---
                               InkWell(
                                 onTap: () {
                                   setState(() {
@@ -329,20 +336,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                           _rememberMe = newValue!;
                                         });
                                       },
-                                      // Warna tanda centang
                                       checkColor: Theme.of(context).colorScheme.onPrimary,
-                                      // Mengontrol warna isian kotak
                                       fillColor: MaterialStateProperty.resolveWith<Color>(
                                         (Set<MaterialState> states) {
-                                          // Warna saat dicentang
                                           if (states.contains(MaterialState.selected)) {
                                             return Theme.of(context).colorScheme.primary;
                                           }
-                                          // Warna saat tidak dicentang (di tema gelap)
                                           if(isDarkMode) {
                                             return Colors.white70;
                                           }
-                                          // Warna default saat tidak dicentang (di tema terang)
                                           return Theme.of(context).unselectedWidgetColor;
                                         },
                                       ),

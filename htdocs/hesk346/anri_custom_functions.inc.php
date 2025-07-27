@@ -2,7 +2,6 @@
 /**
  * File: anri_custom_functions.inc.php
  * Deskripsi: Berisi semua fungsi kustom untuk integrasi ANRI.
- * Versi: GABUNGAN (Logika Awal + Penerapan Robust dari V3)
  */
 
 // Keamanan: Pastikan file ini tidak diakses langsung.
@@ -16,7 +15,6 @@ if (!defined('IN_SCRIPT')) {
 
 /**
  * [FCM] Menjalankan skrip API untuk mengirim notifikasi push ke Firebase.
- * Fungsi ini sekarang menerima path sebagai parameter, bukan dari global/konstanta.
  * @param string $php_exe         Path ke php.exe di server.
  * @param string $api_path        Path ke folder API ANRI.
  * @param int    $user_id         ID Staf penerima.
@@ -57,7 +55,6 @@ function anri_send_fcm_notification($php_exe, $api_path, $user_id, $title, $body
 
 /**
  * [TELEGRAM] Mengirim notifikasi ke grup Telegram.
- * Fungsi ini sekarang menerima token dan chat_id sebagai parameter.
  * @param string $token   Token Bot Telegram.
  * @param string $chat_id ID Chat Grup Telegram.
  * @param string $message Pesan dalam format Markdown.
@@ -95,7 +92,6 @@ function anri_send_telegram_notification($token, $chat_id, $message) {
 
 /**
  * Fungsi HUB terpusat untuk mengirim SEMUA jenis notifikasi.
- * LOGIKA TETAP SAMA DENGAN KODE AWAL, NAMUN DENGAN PENERAPAN ROBUST.
  * @param mixed  $hesk_settings_param Parameter tambahan untuk mencegah 'fatal error' dari HESK.
  * @param string $event_type          Tipe event notifikasi.
  * @param array  $ticket              Data tiket.
@@ -104,14 +100,14 @@ function anri_send_telegram_notification($token, $chat_id, $message) {
  */
 function anri_kirim_semua_notifikasi($hesk_settings_param, $event_type, $ticket, $actor_id = 0, $message_content = '') {
 
-    // --- BLOK PERBAIKAN STABILITAS ---
+
     // Memuat ulang file konfigurasi secara paksa untuk memastikan data selalu benar dan
     // menghindari masalah dengan variabel global.
     require(HESK_PATH . 'hesk_settings.inc.php');
     if (file_exists(HESK_PATH . 'anri_config.inc.php')) {
         require_once(HESK_PATH . 'anri_config.inc.php');
     }
-    // --- AKHIR BLOK PERBAIKAN ---
+  
 
     // --- Konfigurasi Notifikasi (didefinisikan di sini, bukan di global) ---
     $php_exe_path     = 'C:\xampp\php\php.exe'; // PENTING: Sesuaikan path ini
@@ -120,8 +116,10 @@ function anri_kirim_semua_notifikasi($hesk_settings_param, $event_type, $ticket,
     $telegram_chat_id = $hesk_settings['telegram_chat_id'] ?? '';
 
     // --- Variabel Umum (dibuat lebih aman dengan ?? operator) ---
+
     $priority_map  = array(0 => 'Critical🔥', 1 => 'High⚡', 2 => 'Medium🌊', 3 => 'Low🐌');
     $priority_text = $priority_map[$ticket['priority']] ?? 'N/A';
+
     $pelanggan     = $ticket['name'] ?? 'Pelanggan';
     $subjek        = $ticket['subject'] ?? 'Tanpa Subjek';
     $trackid       = $ticket['trackid'] ?? 'N/A';
@@ -138,27 +136,31 @@ function anri_kirim_semua_notifikasi($hesk_settings_param, $event_type, $ticket,
     $telegram_message    = '';
     $users_to_notify_fcm = [];
 
-    // --- Logika untuk menentukan pesan & penerima (SAMA SEPERTI KODE AWAL) ---
+    // --- Logika untuk menentukan pesan & penerima ---
     switch ($event_type) {
         case 'new_assigned':
         case 'new_unassigned':
             $is_from_admin = ($actor_id > 0);
-            // Penanganan variabel custom_field dibuat lebih aman
             $unit_kerja = !empty($ticket['custom1']) ? ' (' . $ticket['custom1'] . ')' : '';
 
             // Pesan untuk FCM
             $fcm_title = ($event_type == 'new_assigned') ? "📩 Tiket Ditugaskan: #$trackid" : "📩 Tiket Baru: #$trackid";
-            $fcm_body = "👤 $pelanggan$unit_kerja: \"$subjek\" (Prioritas: $priority_text)";
+
+            $fcm_body = "👤 $pelanggan$unit_kerja: $subjek (Prioritas: $priority_text)";
+
 
             // Pesan untuk Telegram
             $icon = $is_from_admin ? "📝" : "🔔";
             $title_tele = $is_from_admin ? "Tiket Baru Dibuat oleh Staf" : "Tiket Baru Diterima";
+
             $telegram_message = "$icon *$title_tele*\n\n" .
                                 "👤 *Pelapor:* {$pelanggan}\n" .
-                                "🏢 *Unit Kerja:* " . ($ticket['custom1'] ?: 'N/A') . "\n" . // Dibuat lebih aman
+                                "🏢 *Unit Kerja:* " . ($ticket['custom1'] ?: 'N/A') . "\n" .
                                 "✉️ *Subjek:* {$subjek}\n" .
+                                "📊 *Prioritas:* {$priority_text}\n" . 
                                 "🆔 *Tracking ID:* `{$trackid}`\n\n" .
                                 "[Buka & Tangani Tiket]({$ticket_link_admin})";
+
 
             // Tentukan penerima FCM
             if ($event_type == 'new_assigned' && !empty($ticket['owner']) && $ticket['owner'] != $actor_id) {
@@ -172,20 +174,22 @@ function anri_kirim_semua_notifikasi($hesk_settings_param, $event_type, $ticket,
             break;
 
         case 'reply_customer':
-            // Penanganan pesan balasan dibuat lebih aman
             $clean_reply = !empty($message_content) ? substr(strip_tags($message_content), 0, 150) : '[pesan kosong]';
             $clean_reply .= (strlen($message_content) > 150 ? '...' : '');
 
             // Pesan untuk FCM
             $fcm_title = "💬 Balasan Baru di Tiket #$trackid";
-            $fcm_body = "👤 $pelanggan membalas: \"$clean_reply\"";
+            $fcm_body = "👤 $pelanggan membalas: $clean_reply";
 
             // Pesan untuk Telegram
+ 
             $telegram_message = "💬 *Balasan Baru dari Pelanggan*\n\n" .
                                 "👤 *Dari:* {$pelanggan}\n" .
                                 "✉️ *Subjek:* {$subjek}\n" .
+                                "📊 *Prioritas:* {$priority_text}\n" . 
                                 "🆔 *Tracking ID:* `{$trackid}`\n\n" .
                                 "[Lihat Balasan]({$ticket_link_admin})";
+
 
             // Tentukan penerima FCM
             if (!empty($ticket['owner'])) {
@@ -199,19 +203,17 @@ function anri_kirim_semua_notifikasi($hesk_settings_param, $event_type, $ticket,
             break;
     }
 
-    // --- EKSEKUSI PENGIRIMAN (memanggil fungsi helper yang sudah robust) ---
+    // --- EKSEKUSI PENGIRIMAN ---
 
-    // 1. Kirim Notifikasi FCM ke semua staf yang relevan
+    // 1. Kirim Notifikasi FCM
     if (!empty($fcm_title) && !empty($users_to_notify_fcm)) {
         foreach (array_unique($users_to_notify_fcm) as $user_id) {
-            // Memanggil fungsi dengan parameter konfigurasi
             anri_send_fcm_notification($php_exe_path, $anri_api_path, $user_id, $fcm_title, $fcm_body, $ticket_id);
         }
     }
 
-    // 2. Kirim Notifikasi Telegram (dikirim sekali ke grup)
+    // 2. Kirim Notifikasi Telegram
     if (!empty($telegram_message)) {
-        // Memanggil fungsi dengan parameter konfigurasi
         anri_send_telegram_notification($telegram_token, $telegram_chat_id, $telegram_message);
     }
 }
