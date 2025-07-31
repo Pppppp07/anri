@@ -1,6 +1,4 @@
-// lib/main.dart
-
-import 'package:anri/models/notification_model.dart'; // <-- PERBAIKAN DI SINI
+import 'package:anri/models/notification_model.dart';
 import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/app_data_provider.dart';
 import 'package:anri/providers/notification_provider.dart';
@@ -20,26 +18,20 @@ import 'dart:convert';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
-// Handler ini harus berada di luar kelas (top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Inisialisasi Firebase agar plugin bisa digunakan di background isolate.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint("Notifikasi Background Diterima: ${message.messageId}");
-  // Logika untuk menyimpan notifikasi secara manual ke SharedPreferences
   final prefs = await SharedPreferences.getInstance();
 
-  // 1. Ambil riwayat notifikasi yang sudah ada
   final List<String> notificationsJson =
       prefs.getStringList('notification_history') ?? [];
   final List<NotificationModel> notifications = notificationsJson
       .map((jsonString) => NotificationModel.fromJson(json.decode(jsonString)))
       .toList();
 
-  // 2. Buat notifikasi baru dari pesan yang masuk
   final newNotification = NotificationModel.fromRemoteMessage(message);
 
-  // 3. Cek duplikat dan tambahkan jika belum ada, lalu simpan kembali
   if (newNotification.messageId == null ||
       !notifications.any((n) => n.messageId == newNotification.messageId)) {
     notifications.insert(0, newNotification);
@@ -51,7 +43,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         .toList();
     await prefs.setStringList('notification_history', updatedNotificationsJson);
 
-    // 4. Perbarui hitungan notifikasi belum dibaca
     final int unreadCount =
         (prefs.getInt('notification_unread_count') ?? 0) + 1;
     await prefs.setInt('notification_unread_count', unreadCount);
@@ -63,18 +54,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       '[Background Handler] Notifikasi duplikat terdeteksi, tidak disimpan.',
     );
   }
-  // Panggil metode terpusat untuk menampilkan notifikasi lokal.
-  // Metode ini akan kita buat di firebase_api.dart
-  // Instance baru dibuat karena ini berjalan di isolate yang berbeda.
   await FirebaseApi().showLocalNotification(message);
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Gunakan firebase_options.dart untuk inisialisasi
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // --- [PERUBAHAN 2: DAFTARKAN BACKGROUND HANDLER] ---
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   await initializeDateFormatting('id_ID', null);
@@ -82,7 +68,6 @@ Future<void> main() async {
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     debugPrint(details.toString());
-    // Widget error fallback Anda
     return Material(
       child: Center(
         child: Text(

@@ -34,6 +34,8 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isShrinkResources = false
         }
     }
 }
@@ -43,6 +45,5 @@ flutter {
 }
 
 dependencies {
-    // BARIS 2: VERSI DIPERBARUI SESUAI PESAN ERROR
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

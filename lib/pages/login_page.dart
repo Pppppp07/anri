@@ -1,13 +1,12 @@
 // lib/pages/login_page.dart
 
 import 'package:anri/home_page.dart';
-import 'package:anri/services/firebase_api.dart'; // <-- [PERBAIKAN 1] Tambahkan import FirebaseApi
+import 'package:anri/services/firebase_api.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart'; // <-- [PERBAIKAN 2] Tambahkan import Provider
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:anri/config/api_config.dart';
 
@@ -29,7 +28,10 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   String? _errorMessage;
   bool _rememberMe = true;
 
-  late AnimationController _auroraController;
+  // [PERBAIKAN 1] Controller untuk animasi Text-Reveal
+  late AnimationController _textAnimationController;
+  late Animation<double> _textAnimation;
+  
   late AnimationController _fadeAnimationController;
   late Animation<double> _fadeAnimation;
 
@@ -38,10 +40,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     super.initState();
     _passwordFocusNode = FocusNode();
 
-    _auroraController = AnimationController(
+    _textAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
-    )..repeat();
+      duration: const Duration(milliseconds: 5500), // Sedikit diperlambat
+    )..repeat(); // [PERBAIKAN 2] Cukup repeat, tanpa reverse
+
+    // Animasi akan bernilai dari -1.0 hingga 2.0 untuk loop yang mulus
+    _textAnimation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _textAnimationController, curve: Curves.linear),
+    );
 
     _fadeAnimationController = AnimationController(
       vsync: this,
@@ -58,7 +65,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _auroraController.dispose();
+    _textAnimationController.dispose();
     _fadeAnimationController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -66,6 +73,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  // SEMUA LOGIKA LOGIN ANDA TETAP SAMA
   void _loadCredentials() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? username = prefs.getString('user_username');
@@ -98,6 +106,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     }
   }
 
+  // --- FUNGSI INI TELAH DIPERBARUI ---
   Future<void> _handleLogin() async {
     HapticFeedback.lightImpact();
 
@@ -120,7 +129,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                 'password': _passwordController.text,
               }),
             )
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 15)); // Timeout sedikit diperpanjang
 
         if (!mounted) return;
 
@@ -133,14 +142,11 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
 
           if (authToken != null) {
             await _saveCredentials(userData: userData, token: authToken);
-
-            // --- [PERBAIKAN 3: INISIALISASI ULANG NOTIFIKASI] ---
-            // Panggil initNotifications SETELAH kredensial (terutama auth_token) disimpan.
-            // Ini akan mendapatkan token FCM baru dan mengirimkannya ke server dengan sesi yang valid.
+            
             if (mounted) {
+              // Inisialisasi notifikasi setelah kredensial disimpan
               await context.read<FirebaseApi>().initNotifications();
             }
-            // --- [AKHIR PERBAIKAN] ---
             
             if (mounted) {
               Navigator.pushReplacement(
@@ -164,12 +170,16 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                 responseData['message'] ?? 'Username atau password salah.';
           });
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
+        // --- INI PERUBAHAN PALING PENTING ---
+        // Kita akan menampilkan error yang sebenarnya ke layar.
         debugPrint('Login Error: $e');
+        debugPrint('Stack trace: $stackTrace');
         setState(() {
-          _errorMessage =
-              'Tidak dapat terhubung. Periksa koneksi atau hubungi admin.';
+          _errorMessage = 'Terjadi Error Internal: ${e.toString()}';
         });
+        // ------------------------------------
+
       } finally {
         if (mounted) {
           setState(() {
@@ -179,6 +189,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -232,34 +243,58 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             ),
                           ),
                           const SizedBox(height: 16),
+                          
+                          // [PERBAIKAN 3] Logika ShaderMask untuk loop yang mulus
                           AnimatedBuilder(
-                            animation: _auroraController,
+                            animation: _textAnimation,
                             builder: (context, child) {
-                              final double value = _auroraController.value;
                               return ShaderMask(
-                                shaderCallback: (bounds) => LinearGradient(
-                                  colors: [
-                                    Colors.blue.shade300,
-                                    Colors.blue.shade700,
-                                    Colors.lightBlueAccent,
-                                  ],
-                                  begin: Alignment(math.sin(value * 2 * math.pi * 1.2), math.cos(value * 2 * math.pi)),
-                                  end: Alignment(math.cos(value * 2 * math.pi), math.sin(value * 2 * math.pi * 1.5)),
-                                ).createShader(bounds),
-                                child: const Text(
-                                  'Helpdesk',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 2,
-                                  ),
-                                ),
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (bounds) {
+                                  // Nilai animasi sekarang berjalan dari -1.0 hingga 2.0
+                                  final slidePosition = _textAnimation.value;
+                                  const highlightWidth = 0.2; // Lebar "cahaya"
+
+                                  return LinearGradient(
+                                    colors: const [
+                                      Colors.blue,
+                                      Colors.lightBlueAccent,
+                                      Colors.white,
+                                      Colors.lightBlueAccent,
+                                      Colors.blue,
+                                    ],
+                                    // 'stops' bergerak bersama nilai animasi
+                                    stops: [
+                                      slidePosition - (highlightWidth * 2),
+                                      slidePosition - highlightWidth,
+                                      slidePosition,
+                                      slidePosition + highlightWidth,
+                                      slidePosition + (highlightWidth * 2),
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ).createShader(bounds);
+                                },
+                                child: child,
                               );
                             },
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                'Helpdesk',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 2,
+                                  color: Colors.blue.shade900,
+                                ),
+                              ),
+                            ),
                           ),
+                          
                           const SizedBox(height: 40),
-                          TextFormField(
+                          // Sisa dari Form Anda tetap sama
+                           TextFormField(
                             controller: _usernameController,
                             keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,

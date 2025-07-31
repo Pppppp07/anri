@@ -9,7 +9,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,62 +21,51 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+  // Controller untuk animasi Text-Reveal
+  late AnimationController _textAnimationController;
+  late Animation<double> _textAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _textAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: const Duration(milliseconds: 3500),
     )..repeat();
 
-    // Memanggil alur utama setelah frame pertama selesai di-render.
+    // Animasi akan bernilai dari -1.0 hingga 2.0 untuk loop yang mulus
+    _textAnimation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _textAnimationController, curve: Curves.linear),
+    );
+
+    // Memanggil alur utama aplikasi Anda
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeApp();
     });
   }
 
-  // --- [PERBAIKAN UTAMA] Alur inisialisasi aplikasi terpusat ---
+  // SEMUA LOGIKA ANDA TETAP SAMA
   Future<void> _initializeApp() async {
-    // Beri jeda agar splash screen terlihat.
-    await Future.delayed(const Duration(milliseconds: 2500));
-    
+    await Future.delayed(const Duration(milliseconds: 3500));
     if (!mounted) return;
-
-    // 1. Muat semua data esensial dari provider.
-    // `context.read` aman digunakan di sini karena ini adalah event satu kali.
     final settingsProvider = context.read<SettingsProvider>();
     final appDataProvider = context.read<AppDataProvider>();
-
-    // Menunggu semua data siap: pengaturan dan data anggota tim.
     await Future.wait([
       settingsProvider.loadSettings(),
       appDataProvider.fetchTeamMembers(),
     ]);
-
     if (!mounted) return;
-
-    // 2. Cek status login.
     final prefs = await SharedPreferences.getInstance();
     final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-
-    // 3. Cek apakah aplikasi dibuka dari notifikasi saat terminated.
     final RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-
     if (!mounted) return;
-
-    // 4. Tentukan alur navigasi berdasarkan status login dan notifikasi.
     if (isLoggedIn) {
       final bool appLockEnabled = settingsProvider.isAppLockEnabled;
-      bool authenticated = true; // Anggap berhasil jika kunci aplikasi mati.
-
+      bool authenticated = true;
       if (appLockEnabled) {
         authenticated = await _authenticateWithExit();
       }
-
       if (authenticated) {
-        // Jika notifikasi awal ada, langsung navigasi ke detail tiket.
         if (initialMessage != null) {
           _navigateToHomeAndHandleNotification(prefs, initialMessage);
         } else {
@@ -85,7 +73,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         }
       }
     } else {
-      // Jika belum login, selalu ke halaman login.
       _navigateToLogin();
     }
   }
@@ -95,7 +82,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     try {
       final bool canAuthenticate = await auth.canCheckBiometrics || await auth.isDeviceSupported();
       if (!canAuthenticate) return true;
-
       return await auth.authenticate(
         localizedReason: 'Silakan otentikasi untuk membuka aplikasi ANRI Helpdesk',
         options: const AuthenticationOptions(stickyAuth: true, biometricOnly: false),
@@ -110,7 +96,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void _navigateToHome(SharedPreferences prefs) {
     final String? userName = prefs.getString('user_name');
     final String? authToken = prefs.getString('auth_token');
-
     if (userName != null && authToken != null && mounted) {
       Navigator.pushReplacement(
         context,
@@ -123,32 +108,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  // --- [FUNGSI BARU] Navigasi ke HomePage lalu langsung proses notifikasi ---
   void _navigateToHomeAndHandleNotification(SharedPreferences prefs, RemoteMessage message) {
     final String? userName = prefs.getString('user_name');
     final String? authToken = prefs.getString('auth_token');
-
     if (userName != null && authToken != null && mounted) {
-      // Ganti halaman saat ini dengan HomePage.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => HomePage(currentUserName: userName, authToken: authToken),
         ),
       );
-      
-      // Setelah HomePage siap, panggil logika navigasi notifikasi.
-      // Memberi sedikit jeda memastikan HomePage sudah terbangun sepenuhnya.
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
            final ticketId = message.data['ticket_id'];
            if (ticketId != null) {
-              // Gunakan context dari provider, bukan dari splash screen yang akan hilang.
               context.read<FirebaseApi>().navigateToTicketDetail(ticketId);
            }
         }
       });
-
     } else {
       _navigateToLogin();
     }
@@ -171,74 +148,98 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    _controller.dispose();
+    _textAnimationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Latar belakang gradien yang sama persis dengan login_page.dart
+    final backgroundDecoration = BoxDecoration(
+      gradient: LinearGradient(
+        colors: isDarkMode
+            ? [
+                Theme.of(context).colorScheme.surface,
+                Theme.of(context).colorScheme.background
+              ]
+            : [
+                Colors.white,
+                const Color(0xFFE0F2F7),
+                const Color(0xFFBBDEFB),
+                Colors.blueAccent
+              ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ),
+    );
+
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: Theme.of(context).brightness == Brightness.dark
-                ? [const Color(0xFF2c3e50), const Color(0xFF212f3c)]
-                : [Colors.white, const Color(0xFFE0F2F7), const Color(0xFFBBDEFB), Colors.blueAccent],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: const [0.0, 0.4, 0.7, 1.0],
-          ),
-        ),
+        width: double.infinity,
+        height: double.infinity,
+        decoration: backgroundDecoration,
         child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Hero(
-                    tag: 'anriLogo',
-                    child: Image.asset(
-                      'assets/images/anri_logo.png',
-                      width: 250,
-                      height: 250,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  ShaderMask(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Hero(
+                tag: 'anriLogo',
+                child: Image.asset(
+                  'assets/images/anri_logo.png',
+                  width: 200,
+                  height: 200,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Menerapkan animasi "Text-Reveal" yang sama
+              AnimatedBuilder(
+                animation: _textAnimation,
+                builder: (context, child) {
+                  return ShaderMask(
+                    blendMode: BlendMode.srcIn,
                     shaderCallback: (bounds) {
-                      final double value = _controller.value;
-                      final Alignment begin = Alignment(
-                        math.sin(value * 2 * math.pi * 2.0),
-                        math.cos(value * 2 * math.pi * 1.5),
-                      );
-                      final Alignment end = Alignment(
-                        math.cos(value * 2 * math.pi * 1.2),
-                        math.sin(value * 2 * math.pi * 2.5),
-                      );
+                      final slidePosition = _textAnimation.value;
+                      const highlightWidth = 0.2;
+
                       return LinearGradient(
-                        colors: [
-                          Colors.blue.shade300,
-                          Colors.blue.shade700,
+                        colors: const [
+                          Colors.blue,
                           Colors.lightBlueAccent,
+                          Colors.white,
+                          Colors.lightBlueAccent,
+                          Colors.blue,
                         ],
-                        begin: begin,
-                        end: end,
+                        stops: [
+                          slidePosition - (highlightWidth * 2),
+                          slidePosition - highlightWidth,
+                          slidePosition,
+                          slidePosition + highlightWidth,
+                          slidePosition + (highlightWidth * 2),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ).createShader(bounds);
                     },
-                    child: const Text(
-                      'Helpdesk',
-                      style: TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 2,
-                      ),
+                    child: child,
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Helpdesk',
+                    style: TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      color: Colors.blue.shade900,
                     ),
                   ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
         ),
       ),
