@@ -263,7 +263,9 @@ flutter build apk
 
 ```
 ├── anri/
-│   ├── android/app/google-services.json           ← Penempatan file google-services.json 
+│   ├── android/
+│       ├──app/
+│          ├──google-services.json           ← Penempatan file google-services.json 
 │   ├── .env                                       ← konfigurasi Flutter (.env untuk IP API)
 ```
 
