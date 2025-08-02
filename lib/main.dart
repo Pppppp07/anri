@@ -1,3 +1,5 @@
+// lib/main.dart
+
 import 'package:anri/models/notification_model.dart';
 import 'package:anri/pages/splash_screen.dart';
 import 'package:anri/providers/app_data_provider.dart';
@@ -18,47 +20,51 @@ import 'dart:convert';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
+// Handler ini harus berada di luar kelas (top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Inisialisasi Firebase agar plugin bisa digunakan di background isolate.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint("Notifikasi Background Diterima: ${message.messageId}");
-  final prefs = await SharedPreferences.getInstance();
 
-  final List<String> notificationsJson =
-      prefs.getStringList('notification_history') ?? [];
-  final List<NotificationModel> notifications = notificationsJson
-      .map((jsonString) => NotificationModel.fromJson(json.decode(jsonString)))
-      .toList();
+  if (message.notification == null) {
+    debugPrint("[Background Handler] Pesan ini adalah data-only, membuat notifikasi lokal.");
 
-  final newNotification = NotificationModel.fromRemoteMessage(message);
-
-  if (newNotification.messageId == null ||
-      !notifications.any((n) => n.messageId == newNotification.messageId)) {
-    notifications.insert(0, newNotification);
-    if (notifications.length > 50) {
-      notifications.removeLast();
-    }
-    final List<String> updatedNotificationsJson = notifications
-        .map((notif) => json.encode(notif.toJson()))
+    // Logika untuk menyimpan notifikasi (opsional, bisa dipertahankan jika diperlukan)
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> notificationsJson =
+        prefs.getStringList('notification_history') ?? [];
+    final List<NotificationModel> notifications = notificationsJson
+        .map((jsonString) =>
+            NotificationModel.fromJson(json.decode(jsonString)))
         .toList();
-    await prefs.setStringList('notification_history', updatedNotificationsJson);
+    final newNotification = NotificationModel.fromRemoteMessage(message);
 
-    final int unreadCount =
-        (prefs.getInt('notification_unread_count') ?? 0) + 1;
-    await prefs.setInt('notification_unread_count', unreadCount);
-    debugPrint(
-      '[Background Handler] Notifikasi disimpan, total belum dibaca: $unreadCount',
-    );
+    if (newNotification.messageId == null ||
+        !notifications.any((n) => n.messageId == newNotification.messageId)) {
+      notifications.insert(0, newNotification);
+      if (notifications.length > 50) {
+        notifications.removeLast();
+      }
+      final List<String> updatedNotificationsJson =
+          notifications.map((notif) => json.encode(notif.toJson())).toList();
+      await prefs.setStringList(
+          'notification_history', updatedNotificationsJson);
+    }
+    
+    // Panggil metode terpusat untuk menampilkan notifikasi lokal.
+    // Hanya panggil ini jika message.notification-nya null.
+    await FirebaseApi().showLocalNotification(message);
   } else {
-    debugPrint(
-      '[Background Handler] Notifikasi duplikat terdeteksi, tidak disimpan.',
-    );
+    debugPrint("[Background Handler] Pesan ini memiliki payload notifikasi, sistem akan menampilkannya.");
   }
-  await FirebaseApi().showLocalNotification(message);
+  // --- [AKHIR PERBAIKAN UTAMA] ---
 }
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Gunakan firebase_options.dart untuk inisialisasi
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -68,6 +74,7 @@ Future<void> main() async {
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     debugPrint(details.toString());
+    // Widget error fallback Anda
     return Material(
       child: Center(
         child: Text(

@@ -1274,11 +1274,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        IconButton(
-          icon: const Icon(Icons.attach_file),
-          onPressed: _pickFiles,
-          tooltip: 'Lampirkan File',
-        ),
+        // IconButton(
+        //   icon: const Icon(Icons.attach_file),
+        //   onPressed: _pickFiles,
+        //   tooltip: 'Lampirkan File',
+        // ),
         const SizedBox(width: 8),
         ElevatedButton.icon(
           onPressed: _isSubmittingReply ? null : _submitReply,
