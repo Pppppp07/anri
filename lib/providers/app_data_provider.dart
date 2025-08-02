@@ -8,18 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AppDataProvider with ChangeNotifier {
   List<String> _teamMembers = ['Unassigned'];
-  final Map<String, String> _categories = {
-    'All': 'Semua Kategori',
-    '1': 'Aplikasi Sistem Informasi', '2': 'SRIKANDI',
-    '3': 'Layanan Kepegawaian', '4': 'Perangkat Lunak',
-    '5': 'Perangkat Keras', '6': 'Jaringan Komputer',
-    '7': 'Bangunan', '8': 'Mesin dan AC', '9': 'Listrik',
-    '10': 'Kendaraan Dinas', '11': 'Pengembalian BMN',
-    '12': 'Insiden Siber', '13': 'Pusat Data Nasional',
-    '14': 'CCTV', '15': 'Email Dinas',
-  };
-
+  // --- PERBAIKAN: _categories sekarang akan diisi secara dinamis ---
+  Map<String, String> _categories = {'All': 'Semua Kategori'};
   bool _isTeamLoading = false;
+  bool _isCategoriesLoading = false;
 
   List<String> get teamMembers => _teamMembers;
   Map<String, String> get categories => _categories;
@@ -31,8 +23,50 @@ class AppDataProvider with ChangeNotifier {
       
   bool get isTeamLoading => _isTeamLoading;
 
-  Future<void> fetchTeamMembers() async {
-    if (_isTeamLoading || _teamMembers.length > 1) return;
+  // --- PERBAIKAN UTAMA 1: Tambahkan parameter forceRefresh ---
+  Future<void> fetchCategories({bool forceRefresh = false}) async {
+    // Jika tidak dipaksa refresh dan data sudah ada, jangan panggil API lagi.
+    if (!forceRefresh && (_isCategoriesLoading || _categories.length > 1)) return;
+
+    _isCategoriesLoading = true;
+    notifyListeners();
+
+    final headers = await _getAuthHeaders();
+    if (headers.isEmpty) {
+      _isCategoriesLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/get_categories.php');
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final Map<String, dynamic> data = responseData['data'];
+          final Map<String, String> fetchedCategories = {'All': 'Semua Kategori'};
+          
+          data.forEach((key, value) {
+            fetchedCategories[key] = value.toString().trim();
+          });
+          
+          _categories = fetchedCategories;
+        }
+      }
+    } catch (e) {
+      debugPrint("Gagal mengambil daftar kategori: $e");
+    } finally {
+      _isCategoriesLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // --- PERBAIKAN UTAMA 2: Tambahkan parameter forceRefresh ---
+  Future<void> fetchTeamMembers({bool forceRefresh = false}) async {
+    // Jika tidak dipaksa refresh dan data sudah ada, jangan panggil API lagi.
+    if (!forceRefresh && (_isTeamLoading || _teamMembers.length > 1)) return;
 
     _isTeamLoading = true;
     notifyListeners();
@@ -52,7 +86,12 @@ class AppDataProvider with ChangeNotifier {
         final responseData = json.decode(response.body);
         if (responseData['success'] == true) {
           final List<dynamic> data = responseData['data'];
-          _teamMembers = data.map((user) => user['name'].toString()).toList();
+          // Pastikan 'Unassigned' ada di depan jika belum ada
+          List<String> members = data.map((user) => user['name'].toString()).toList();
+          if (!members.contains('Unassigned')) {
+             members.insert(0, 'Unassigned');
+          }
+          _teamMembers = members;
         }
       }
     } catch (e) {

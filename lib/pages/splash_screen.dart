@@ -44,21 +44,29 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     });
   }
 
-  // SEMUA LOGIKA ANDA TETAP SAMA
+  // --- [PERUBAHAN UTAMA DI SINI] ---
   Future<void> _initializeApp() async {
     await Future.delayed(const Duration(milliseconds: 3500));
     if (!mounted) return;
+    
     final settingsProvider = context.read<SettingsProvider>();
     final appDataProvider = context.read<AppDataProvider>();
+    
+    // Sekarang memanggil fetchCategories() bersamaan dengan fetchTeamMembers()
     await Future.wait([
       settingsProvider.loadSettings(),
       appDataProvider.fetchTeamMembers(),
+      appDataProvider.fetchCategories(), // <-- FUNGSI BARU DIPANGGIL DI SINI
     ]);
+
     if (!mounted) return;
+    
     final prefs = await SharedPreferences.getInstance();
     final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    
     if (!mounted) return;
+    
     if (isLoggedIn) {
       final bool appLockEnabled = settingsProvider.isAppLockEnabled;
       bool authenticated = true;
@@ -76,6 +84,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       _navigateToLogin();
     }
   }
+  // --- [AKHIR PERUBAHAN] ---
 
   Future<bool> _authenticateWithExit() async {
     final LocalAuthentication auth = LocalAuthentication();
@@ -156,7 +165,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Latar belakang gradien yang sama persis dengan login_page.dart
     final backgroundDecoration = BoxDecoration(
       gradient: LinearGradient(
         colors: isDarkMode
@@ -193,8 +201,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Menerapkan animasi "Text-Reveal" yang sama
               AnimatedBuilder(
                 animation: _textAnimation,
                 builder: (context, child) {
